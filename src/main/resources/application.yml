@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: ai-ops-agent
+  datasource:
+    url: jdbc:mysql://localhost:3306/ai_ops_agent?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf8&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+      platform: mysql
+      encoding: UTF-8
+
+server:
+  port: 8080
+
+aiops:
+  llm:
+    timeout-seconds: 60
+    default-temperature: 0.2
+  memory:
+    max-history-messages: 10
+  cors:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+  type-aliases-package: com.example.aiops.entity
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level traceId=%X{traceId} %logger - %msg%n"

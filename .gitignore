@@ -1,0 +1,22 @@
+# Build outputs
+target/
+frontend/dist/
+
+# Dependencies and local caches
+.m2/
+frontend/node_modules/
+
+# Logs and runtime output
+*.log
+*.err.log
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Environment overrides
+.env
+.env.*
+!.env.example
