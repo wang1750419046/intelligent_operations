@@ -91,6 +91,22 @@
           </div>
         </div>
 
+        <div v-if="lastReferences.length" class="reference-panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-kicker">Similar Cases</p>
+              <h3>相似故障案例</h3>
+            </div>
+          </div>
+          <div class="reference-list">
+            <article v-for="item in lastReferences" :key="`${item.source}-${item.title}`" class="reference-item">
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.source }}<template v-if="item.score"> / 相似度 {{ Number(item.score).toFixed(2) }}</template></span>
+              <p>{{ item.content }}</p>
+            </article>
+          </div>
+        </div>
+
         <div class="composer">
           <textarea
             v-model="userInput"
@@ -146,6 +162,7 @@ const activeSessionTitle = ref('')
 const messages = ref([])
 const traceSteps = ref([])
 const lastTraceId = ref('')
+const lastReferences = ref([])
 const sending = ref(false)
 const errorMessage = ref('')
 const userInput = ref('')
@@ -165,7 +182,7 @@ const loadSessions = async () => {
 }
 
 const loadModelConfigs = async () => {
-  const response = await listModelConfigs()
+  const response = await listModelConfigs('CHAT')
   modelConfigs.value = (response.data || []).filter((item) => item.enabled)
   if (!activeSessionId.value && !chatModelConfigId.value) {
     const readyConfig = modelConfigs.value.find((item) => item.defaultConfig && item.hasApiKey)
@@ -185,6 +202,7 @@ const selectSession = async (sessionId) => {
   chatModelConfigId.value = response.data.modelConfigId
   messages.value = response.data.messages || []
   traceSteps.value = []
+  lastReferences.value = []
 }
 
 const handleCreateSession = async () => {
@@ -224,6 +242,7 @@ const handleSend = async () => {
     lastTraceId.value = response.traceId
     userInput.value = ''
     await selectSession(activeSessionId.value)
+    lastReferences.value = (response.data?.references || []).filter((item) => item.type === 'kb')
     await loadSessions()
   } catch (error) {
     errorMessage.value = error.message

@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface ModelConfigService {
 
-    List<ModelConfigResponse> listAll();
+    List<ModelConfigResponse> listAll(String configType);
 
     ModelConfigResponse getById(Long id);
 

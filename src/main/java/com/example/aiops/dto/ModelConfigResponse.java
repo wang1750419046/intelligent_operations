@@ -7,6 +7,7 @@ public class ModelConfigResponse {
     private Long id;
     private String name;
     private String provider;
+    private String configType;
     private String baseUrl;
     private String modelName;
     private BigDecimal temperature;
@@ -38,6 +39,14 @@ public class ModelConfigResponse {
 
     public void setProvider(String provider) {
         this.provider = provider;
+    }
+
+    public String getConfigType() {
+        return configType;
+    }
+
+    public void setConfigType(String configType) {
+        this.configType = configType;
     }
 
     public String getBaseUrl() {

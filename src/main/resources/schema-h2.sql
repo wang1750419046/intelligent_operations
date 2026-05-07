@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS llm_config (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(128) NOT NULL,
     provider VARCHAR(32) NOT NULL,
+    config_type VARCHAR(32) NOT NULL DEFAULT 'CHAT',
     base_url VARCHAR(255) NOT NULL,
     api_key VARCHAR(255) NULL,
     model_name VARCHAR(128) NOT NULL,

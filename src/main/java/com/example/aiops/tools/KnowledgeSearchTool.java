@@ -34,10 +34,10 @@ public class KnowledgeSearchTool {
                 references = List.of(new ReferenceItem("kb", "知识库检索结果", summary, "mysql-kb"));
             } else {
                 summary = docs.stream()
-                        .map(doc -> doc.getTitle() + ": " + doc.getContent())
+                        .map(doc -> doc.getTitle() + formatScore(doc.getSimilarityScore()) + ": " + doc.getContent())
                         .collect(Collectors.joining(" | "));
                 references = docs.stream()
-                        .map(doc -> new ReferenceItem("kb", doc.getTitle(), doc.getContent(), doc.getSource()))
+                        .map(doc -> new ReferenceItem("kb", doc.getTitle(), doc.getContent(), doc.getSource(), doc.getSimilarityScore()))
                         .toList();
             }
             toolCallbackSupport.success("search_knowledge", params, summary, references);
@@ -45,5 +45,12 @@ public class KnowledgeSearchTool {
         } catch (Exception ex) {
             return toolCallbackSupport.failure("search_knowledge", params, ex);
         }
+    }
+
+    private String formatScore(Double score) {
+        if (score == null) {
+            return "";
+        }
+        return " (相似度 " + String.format("%.2f", score) + ")";
     }
 }

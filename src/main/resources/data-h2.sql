@@ -10,14 +10,18 @@ INSERT INTO knowledge_document (doc_id, title, content, source, tags, embedding_
 SELECT 'kb-003', '线程池耗尽处理手册', '若日志存在 RejectedExecutionException 或 queue full，说明业务线程池可能耗尽。', 'runbook', 'threadpool,queue,reject', 'READY'
 WHERE NOT EXISTS (SELECT 1 FROM knowledge_document WHERE doc_id = 'kb-003');
 
-INSERT INTO llm_config (name, provider, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
-SELECT 'OpenAI GPT 默认', 'OPENAI', 'https://api.openai.com/v1', '', 'gpt-4.1-mini', 0.20, 4096, 1, 1
+INSERT INTO llm_config (name, provider, config_type, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
+SELECT 'OpenAI GPT 默认', 'OPENAI', 'CHAT', 'https://api.openai.com/v1', '', 'gpt-4.1-mini', 0.20, 4096, 1, 1
 WHERE NOT EXISTS (SELECT 1 FROM llm_config WHERE name = 'OpenAI GPT 默认');
 
-INSERT INTO llm_config (name, provider, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
-SELECT 'Qwen 默认', 'QWEN', 'https://dashscope.aliyuncs.com/compatible-mode/v1', '', 'qwen-plus', 0.20, 4096, 1, 0
+INSERT INTO llm_config (name, provider, config_type, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
+SELECT 'Qwen 默认', 'QWEN', 'CHAT', 'https://dashscope.aliyuncs.com/compatible-mode/v1', '', 'qwen-plus', 0.20, 4096, 1, 0
 WHERE NOT EXISTS (SELECT 1 FROM llm_config WHERE name = 'Qwen 默认');
 
-INSERT INTO llm_config (name, provider, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
-SELECT 'MiniMax 默认', 'MINIMAX', 'https://api.minimaxi.com/v1', '', 'MiniMax-M2.5', 0.20, 4096, 1, 0
+INSERT INTO llm_config (name, provider, config_type, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
+SELECT 'MiniMax 默认', 'MINIMAX', 'CHAT', 'https://api.minimaxi.com/v1', '', 'MiniMax-M2.5', 0.20, 4096, 1, 0
 WHERE NOT EXISTS (SELECT 1 FROM llm_config WHERE name = 'MiniMax 默认');
+
+INSERT INTO llm_config (name, provider, config_type, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
+SELECT 'Qwen Embedding 默认', 'QWEN', 'EMBEDDING', 'https://dashscope.aliyuncs.com/compatible-mode/v1', '', 'text-embedding-v3', 0.20, NULL, 1, 1
+WHERE NOT EXISTS (SELECT 1 FROM llm_config WHERE name = 'Qwen Embedding 默认');

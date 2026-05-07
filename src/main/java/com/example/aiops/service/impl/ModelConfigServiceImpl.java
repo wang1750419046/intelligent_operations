@@ -6,6 +6,7 @@ import com.example.aiops.dto.ModelConfigTestResponse;
 import com.example.aiops.entity.LlmConfig;
 import com.example.aiops.exception.BusinessException;
 import com.example.aiops.mapper.LlmConfigMapper;
+import com.example.aiops.rag.QwenEmbeddingService;
 import com.example.aiops.service.ModelConfigService;
 import com.example.aiops.util.TimeUtils;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -14,20 +15,28 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class ModelConfigServiceImpl implements ModelConfigService {
 
     private final LlmConfigMapper llmConfigMapper;
     private final ChatModelFactory chatModelFactory;
+    private final QwenEmbeddingService qwenEmbeddingService;
 
-    public ModelConfigServiceImpl(LlmConfigMapper llmConfigMapper, ChatModelFactory chatModelFactory) {
+    public ModelConfigServiceImpl(LlmConfigMapper llmConfigMapper,
+                                  ChatModelFactory chatModelFactory,
+                                  QwenEmbeddingService qwenEmbeddingService) {
         this.llmConfigMapper = llmConfigMapper;
         this.chatModelFactory = chatModelFactory;
+        this.qwenEmbeddingService = qwenEmbeddingService;
     }
 
     @Override
-    public List<ModelConfigResponse> listAll() {
+    public List<ModelConfigResponse> listAll(String configType) {
+        if (configType != null && !configType.isBlank()) {
+            return llmConfigMapper.findByConfigType(normalizeConfigType(configType)).stream().map(this::toResponse).toList();
+        }
         return llmConfigMapper.findAll().stream().map(this::toResponse).toList();
     }
 
@@ -43,7 +52,7 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         config.setCreatedAt(LocalDateTime.now());
         config.setUpdatedAt(LocalDateTime.now());
         if (Boolean.TRUE.equals(config.getDefaultConfig())) {
-            llmConfigMapper.clearDefaultFlag();
+            llmConfigMapper.clearDefaultFlag(config.getConfigType());
         }
         llmConfigMapper.insert(config);
         return toResponse(config);
@@ -55,7 +64,7 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         apply(request, config);
         config.setUpdatedAt(LocalDateTime.now());
         if (Boolean.TRUE.equals(config.getDefaultConfig())) {
-            llmConfigMapper.clearDefaultFlag();
+            llmConfigMapper.clearDefaultFlag(config.getConfigType());
         }
         llmConfigMapper.update(config);
         return toResponse(config);
@@ -73,6 +82,10 @@ public class ModelConfigServiceImpl implements ModelConfigService {
             return new ModelConfigTestResponse(false, "当前模型配置缺少 API Key");
         }
         try {
+            if ("EMBEDDING".equalsIgnoreCase(config.getConfigType())) {
+                int dimensions = qwenEmbeddingService.embed("AIOps embedding connection test", config).size();
+                return new ModelConfigTestResponse(true, "连接成功，向量维度: " + dimensions);
+            }
             ChatLanguageModel model = chatModelFactory.create(config);
             String reply = model.generate("请只回复 OK");
             return new ModelConfigTestResponse(true, "连接成功，模型返回: " + reply);
@@ -87,6 +100,9 @@ public class ModelConfigServiceImpl implements ModelConfigService {
             LlmConfig config = findEntity(requestedId);
             if (!Boolean.TRUE.equals(config.getEnabled())) {
                 throw new BusinessException(40021, "selected model config is disabled");
+            }
+            if (!"CHAT".equalsIgnoreCase(config.getConfigType())) {
+                throw new BusinessException(40022, "selected model config is not a chat model");
             }
             return config;
         }
@@ -108,6 +124,7 @@ public class ModelConfigServiceImpl implements ModelConfigService {
     private void apply(ModelConfigRequest request, LlmConfig config) {
         config.setName(request.getName());
         config.setProvider(request.getProvider());
+        config.setConfigType(normalizeConfigType(request.getConfigType()));
         config.setBaseUrl(request.getBaseUrl());
         if (request.getApiKey() != null && !request.getApiKey().isBlank()) {
             config.setApiKey(request.getApiKey().trim());
@@ -124,6 +141,7 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         response.setId(config.getId());
         response.setName(config.getName());
         response.setProvider(config.getProvider());
+        response.setConfigType(config.getConfigType());
         response.setBaseUrl(config.getBaseUrl());
         response.setModelName(config.getModelName());
         response.setTemperature(config.getTemperature());
@@ -144,5 +162,13 @@ public class ModelConfigServiceImpl implements ModelConfigService {
             return "模型调用额度不足，请检查当前模型供应商账号余额、配额或更换有额度的 API Key。";
         }
         return message;
+    }
+
+    private String normalizeConfigType(String configType) {
+        if (configType == null || configType.isBlank()) {
+            return "CHAT";
+        }
+        String normalized = configType.trim().toUpperCase(Locale.ROOT);
+        return "EMBEDDING".equals(normalized) ? "EMBEDDING" : "CHAT";
     }
 }

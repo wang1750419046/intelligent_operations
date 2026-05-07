@@ -23,6 +23,16 @@ aiops:
     max-history-messages: 10
   cors:
     allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+  vector:
+    enabled: true
+    qdrant:
+      host: 8.146.230.188
+      port: 6334
+      collection: aiops_knowledge_v1
+    embedding:
+      default-model: text-embedding-v3
+      dimensions: 1024
+      batch-size: 10
 
 management:
   endpoints:

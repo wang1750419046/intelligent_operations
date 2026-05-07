@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS llm_config (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(128) NOT NULL,
     provider VARCHAR(32) NOT NULL,
+    config_type VARCHAR(32) NOT NULL DEFAULT 'CHAT',
     base_url VARCHAR(255) NOT NULL,
     api_key VARCHAR(255) NULL,
     model_name VARCHAR(128) NOT NULL,
@@ -64,4 +65,18 @@ CREATE TABLE IF NOT EXISTS llm_config (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+SET @add_config_type_sql = (
+    SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE llm_config ADD COLUMN config_type VARCHAR(32) NOT NULL DEFAULT ''CHAT'' AFTER provider',
+        'SELECT 1'
+    )
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'llm_config'
+      AND COLUMN_NAME = 'config_type'
+);
+PREPARE add_config_type_stmt FROM @add_config_type_sql;
+EXECUTE add_config_type_stmt;
+DEALLOCATE PREPARE add_config_type_stmt;
 ALTER TABLE llm_config CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

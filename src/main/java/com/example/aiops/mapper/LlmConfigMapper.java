@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
@@ -17,8 +18,8 @@ import java.util.List;
 public interface LlmConfigMapper {
 
     @Insert("""
-            INSERT INTO llm_config(name, provider, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default, created_at, updated_at)
-            VALUES(#{name}, #{provider}, #{baseUrl}, #{apiKey}, #{modelName}, #{temperature}, #{maxTokens}, #{enabled}, #{defaultConfig}, #{createdAt}, #{updatedAt})
+            INSERT INTO llm_config(name, provider, config_type, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default, created_at, updated_at)
+            VALUES(#{name}, #{provider}, #{configType}, #{baseUrl}, #{apiKey}, #{modelName}, #{temperature}, #{maxTokens}, #{enabled}, #{defaultConfig}, #{createdAt}, #{updatedAt})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(LlmConfig config);
@@ -27,6 +28,7 @@ public interface LlmConfigMapper {
             UPDATE llm_config
             SET name = #{name},
                 provider = #{provider},
+                config_type = #{configType},
                 base_url = #{baseUrl},
                 api_key = #{apiKey},
                 model_name = #{modelName},
@@ -42,6 +44,7 @@ public interface LlmConfigMapper {
     @Select("SELECT * FROM llm_config WHERE id = #{id}")
     @Results(id = "llmConfigMap", value = {
             @Result(property = "baseUrl", column = "base_url"),
+            @Result(property = "configType", column = "config_type"),
             @Result(property = "modelName", column = "model_name"),
             @Result(property = "maxTokens", column = "max_tokens"),
             @Result(property = "defaultConfig", column = "is_default")
@@ -56,12 +59,20 @@ public interface LlmConfigMapper {
     @ResultMap("llmConfigMap")
     List<LlmConfig> findAll();
 
-    @Select("SELECT * FROM llm_config WHERE is_default = 1 LIMIT 1")
+    @Select("SELECT * FROM llm_config WHERE config_type = #{configType} ORDER BY is_default DESC, updated_at DESC, id DESC")
+    @ResultMap("llmConfigMap")
+    List<LlmConfig> findByConfigType(@Param("configType") String configType);
+
+    @Select("SELECT * FROM llm_config WHERE config_type = 'CHAT' AND is_default = 1 LIMIT 1")
     @ResultMap("llmConfigMap")
     LlmConfig findDefault();
 
-    @Update("UPDATE llm_config SET is_default = 0")
-    int clearDefaultFlag();
+    @Select("SELECT * FROM llm_config WHERE config_type = 'EMBEDDING' AND enabled = 1 ORDER BY is_default DESC, updated_at DESC, id DESC LIMIT 1")
+    @ResultMap("llmConfigMap")
+    LlmConfig findActiveEmbedding();
+
+    @Update("UPDATE llm_config SET is_default = 0 WHERE config_type = #{configType}")
+    int clearDefaultFlag(@Param("configType") String configType);
 
     @Delete("DELETE FROM llm_config WHERE id = #{id}")
     int deleteById(Long id);

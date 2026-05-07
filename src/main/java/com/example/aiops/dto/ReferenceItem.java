@@ -6,6 +6,7 @@ public class ReferenceItem {
     private String title;
     private String content;
     private String source;
+    private Double score;
 
     public ReferenceItem() {
     }
@@ -15,6 +16,14 @@ public class ReferenceItem {
         this.title = title;
         this.content = content;
         this.source = source;
+    }
+
+    public ReferenceItem(String type, String title, String content, String source, Double score) {
+        this.type = type;
+        this.title = title;
+        this.content = content;
+        this.source = source;
+        this.score = score;
     }
 
     public String getType() {
@@ -47,5 +56,13 @@ public class ReferenceItem {
 
     public void setSource(String source) {
         this.source = source;
+    }
+
+    public Double getScore() {
+        return score;
+    }
+
+    public void setScore(Double score) {
+        this.score = score;
     }
 }

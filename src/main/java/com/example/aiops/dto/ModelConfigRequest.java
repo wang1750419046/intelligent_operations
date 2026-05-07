@@ -14,6 +14,8 @@ public class ModelConfigRequest {
     @NotBlank
     private String provider;
 
+    private String configType = "CHAT";
+
     @NotBlank
     private String baseUrl;
 
@@ -46,6 +48,14 @@ public class ModelConfigRequest {
 
     public void setProvider(String provider) {
         this.provider = provider;
+    }
+
+    public String getConfigType() {
+        return configType;
+    }
+
+    public void setConfigType(String configType) {
+        this.configType = configType;
     }
 
     public String getBaseUrl() {

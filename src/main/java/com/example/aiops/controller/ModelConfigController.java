@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -29,8 +30,8 @@ public class ModelConfigController {
     }
 
     @GetMapping
-    public UnifiedResponse<List<ModelConfigResponse>> list() {
-        return UnifiedResponse.success(modelConfigService.listAll(), TraceIdHolder.getTraceId());
+    public UnifiedResponse<List<ModelConfigResponse>> list(@RequestParam(required = false) String configType) {
+        return UnifiedResponse.success(modelConfigService.listAll(configType), TraceIdHolder.getTraceId());
     }
 
     @GetMapping("/{id}")

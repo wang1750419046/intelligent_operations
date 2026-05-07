@@ -88,4 +88,13 @@ class ModelConfigControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.name").value("key-retention-updated"))
                 .andExpect(jsonPath("$.data.hasApiKey").value(true));
     }
+
+    @Test
+    void shouldFilterEmbeddingConfigsWithoutLeakingApiKey() throws Exception {
+        mockMvc.perform(get("/api/model-configs").param("configType", "EMBEDDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].configType").value("EMBEDDING"))
+                .andExpect(jsonPath("$.data[0].modelName").value("text-embedding-v3"))
+                .andExpect(jsonPath("$.data[0].apiKey").doesNotExist());
+    }
 }

@@ -9,6 +9,7 @@ public class KnowledgeDocument {
     private String source;
     private String tags;
     private String embeddingStatus;
+    private Double similarityScore;
 
     public Long getId() {
         return id;
@@ -64,5 +65,13 @@ public class KnowledgeDocument {
 
     public void setEmbeddingStatus(String embeddingStatus) {
         this.embeddingStatus = embeddingStatus;
+    }
+
+    public Double getSimilarityScore() {
+        return similarityScore;
+    }
+
+    public void setSimilarityScore(Double similarityScore) {
+        this.similarityScore = similarityScore;
     }
 }
