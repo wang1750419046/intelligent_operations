@@ -1,0 +1,34 @@
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/ai_ops_agent?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf8&allowPublicKeyRetrieval=true
+    username: aiops_user
+    password: change-me
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: never
+      platform: mysql
+      encoding: UTF-8
+
+server:
+  port: 8080
+
+aiops:
+  cors:
+    allowed-origins: http://your-ecs-public-ip
+  vector:
+    enabled: true
+    qdrant:
+      host: 127.0.0.1
+      port: 6334
+      collection: aiops_knowledge_v1
+    embedding:
+      default-model: text-embedding-v3
+      dimensions: 1024
+      batch-size: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

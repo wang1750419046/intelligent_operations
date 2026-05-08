@@ -1,0 +1,160 @@
+name: Deploy to Aliyun ECS
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ecs-master
+  cancel-in-progress: false
+
+env:
+  APP_NAME: aiops
+  JAR_NAME: ai-ops-agent-0.0.1-SNAPSHOT.jar
+  ECS_PORT: ${{ secrets.ECS_PORT || '22' }}
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build backend
+        run: mvn -s settings.xml clean package
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Create deployment package
+        run: |
+          set -euo pipefail
+          mkdir -p deploy-package/backend deploy-package/frontend
+          cp "target/${JAR_NAME}" deploy-package/backend/app.jar
+          cp -R frontend/dist/. deploy-package/frontend/
+          tar -czf deploy-package.tar.gz -C deploy-package .
+
+      - name: Validate deployment secrets
+        run: |
+          set -euo pipefail
+          test -n "${ECS_HOST}" || { echo "ECS_HOST secret is required"; exit 1; }
+          test -n "${ECS_USER}" || { echo "ECS_USER secret is required"; exit 1; }
+          test -n "${ECS_SSH_PRIVATE_KEY}" || { echo "ECS_SSH_PRIVATE_KEY secret is required"; exit 1; }
+        env:
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_USER: ${{ secrets.ECS_USER }}
+          ECS_SSH_PRIVATE_KEY: ${{ secrets.ECS_SSH_PRIVATE_KEY }}
+
+      - name: Configure SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${ECS_SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "${ECS_PORT}" "${ECS_HOST}" >> ~/.ssh/known_hosts
+        env:
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_SSH_PRIVATE_KEY: ${{ secrets.ECS_SSH_PRIVATE_KEY }}
+
+      - name: Upload package to ECS
+        run: |
+          set -euo pipefail
+          scp -P "${ECS_PORT}" deploy-package.tar.gz "${ECS_USER}@${ECS_HOST}:/tmp/${APP_NAME}-${GITHUB_SHA}.tar.gz"
+        env:
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_USER: ${{ secrets.ECS_USER }}
+
+      - name: Activate release on ECS
+        run: |
+          set -euo pipefail
+          ssh -p "${ECS_PORT}" "${ECS_USER}@${ECS_HOST}" "APP_NAME='${APP_NAME}' RELEASE_ID='${GITHUB_SHA}' bash -s" <<'REMOTE'
+            set -euo pipefail
+
+            BASE_DIR="/opt/${APP_NAME}"
+            RELEASE_DIR="${BASE_DIR}/releases/${RELEASE_ID}"
+            PACKAGE="/tmp/${APP_NAME}-${RELEASE_ID}.tar.gz"
+            PID_FILE="${BASE_DIR}/run/${APP_NAME}.pid"
+            LOG_FILE="${BASE_DIR}/logs/${APP_NAME}.log"
+
+            test -f "${BASE_DIR}/config/application-prod.yml" || {
+              echo "${BASE_DIR}/config/application-prod.yml is required on ECS"
+              exit 1
+            }
+
+            mkdir -p "${BASE_DIR}/releases" "${BASE_DIR}/config" "${BASE_DIR}/run" "${BASE_DIR}/logs"
+            rm -rf "${RELEASE_DIR}"
+            mkdir -p "${RELEASE_DIR}"
+            tar -xzf "${PACKAGE}" -C "${RELEASE_DIR}"
+            rm -f "${PACKAGE}"
+
+            ln -sfn "${RELEASE_DIR}" "${BASE_DIR}/current"
+
+            if [ -f "${PID_FILE}" ]; then
+              OLD_PID="$(cat "${PID_FILE}")"
+              if [ -n "${OLD_PID}" ] && kill -0 "${OLD_PID}" 2>/dev/null; then
+                kill "${OLD_PID}"
+                for i in $(seq 1 30); do
+                  if ! kill -0 "${OLD_PID}" 2>/dev/null; then
+                    break
+                  fi
+                  sleep 1
+                done
+                if kill -0 "${OLD_PID}" 2>/dev/null; then
+                  kill -9 "${OLD_PID}"
+                fi
+              fi
+              rm -f "${PID_FILE}"
+            fi
+
+            nohup java -jar "${BASE_DIR}/current/backend/app.jar" \
+              --spring.profiles.active=prod \
+              --spring.config.additional-location="file:${BASE_DIR}/config/application-prod.yml" \
+              > "${LOG_FILE}" 2>&1 &
+            echo "$!" > "${PID_FILE}"
+
+            nginx -t
+            nginx -s reload
+
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8080/actuator/health >/dev/null; then
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "Application health check failed"
+                tail -n 120 "${LOG_FILE}" || true
+                exit 1
+              fi
+              sleep 2
+            done
+
+            find "${BASE_DIR}/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+              | sort -rn \
+              | tail -n +6 \
+              | cut -d' ' -f2- \
+              | xargs -r rm -rf
+          REMOTE
+        env:
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_USER: ${{ secrets.ECS_USER }}
