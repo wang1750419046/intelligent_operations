@@ -1,9 +1,10 @@
 <template>
   <div class="config-workspace">
-    <section class="page-hero compact-hero">
-      <div>
-        <p class="eyebrow">Model Gateway</p>
+    <section class="workspace-topbar">
+      <div class="title-stack">
+        <p class="section-kicker">Model Gateway</p>
         <h2>集中管理聊天模型与向量模型接入</h2>
+        <p>维护生产分析所需的模型、密钥状态和知识库向量索引。</p>
       </div>
       <button class="secondary" @click="resetForm">新建配置</button>
     </section>
@@ -25,7 +26,9 @@
       <div class="status-grid">
         <div>
           <span>Qdrant</span>
-          <strong>{{ vectorStatus.qdrantReachable ? '已连接' : '未就绪' }}</strong>
+          <strong :class="vectorStatus.qdrantReachable ? 'good-text' : 'muted-text'">
+            {{ vectorStatus.qdrantReachable ? '已连接' : '未就绪' }}
+          </strong>
         </div>
         <div>
           <span>Collection</span>
@@ -43,12 +46,12 @@
       <div v-if="reindexResult" class="result-box">{{ reindexResult }}</div>
     </section>
 
-    <div class="segmented-tabs">
+    <div class="segmented-tabs" aria-label="模型类型">
       <button :class="{ active: activeType === 'CHAT' }" @click="switchType('CHAT')">聊天模型</button>
       <button :class="{ active: activeType === 'EMBEDDING' }" @click="switchType('EMBEDDING')">向量模型</button>
     </div>
 
-    <div class="dual-grid">
+    <div class="dual-grid config-layout">
       <section class="panel config-list-pane">
         <div class="panel-header">
           <div>
@@ -67,8 +70,14 @@
           >
             <strong>{{ item.name }}</strong>
             <span>{{ item.provider }} / {{ item.modelName }}</span>
-            <span>{{ item.defaultConfig ? '默认配置' : item.updatedAt }}</span>
+            <span>
+              <template v-if="item.defaultConfig">默认配置</template>
+              <template v-else>{{ item.updatedAt }}</template>
+            </span>
           </button>
+          <div v-if="!modelConfigs.length" class="compact-empty">
+            暂无模型配置
+          </div>
         </div>
       </section>
 

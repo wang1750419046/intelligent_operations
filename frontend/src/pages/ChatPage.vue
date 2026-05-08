@@ -1,37 +1,38 @@
 <template>
   <div class="chat-workspace">
-    <section class="page-hero">
-      <div>
-        <p class="eyebrow">AIOps Command Center</p>
-        <h2>把告警、日志和指标串成一条可追踪的分析链路</h2>
+    <section class="workspace-topbar">
+      <div class="title-stack">
+        <p class="section-kicker">Command Center</p>
+        <h2>AIOps 运维分析台</h2>
+        <p>把告警、日志、指标与知识库收束到同一个诊断上下文。</p>
       </div>
-      <div class="hero-metrics">
-        <div>
-          <span>{{ sessions.length }}</span>
-          <small>会话</small>
+      <div class="topbar-stats" aria-label="当前工作区状态">
+        <div class="stat-tile">
+          <span>会话</span>
+          <strong>{{ sessions.length }}</strong>
         </div>
-        <div>
-          <span>{{ modelConfigs.length }}</span>
-          <small>可用模型</small>
+        <div class="stat-tile">
+          <span>模型</span>
+          <strong>{{ modelConfigs.length }}</strong>
         </div>
-        <div>
-          <span>{{ traceSteps.length }}</span>
-          <small>Trace 步骤</small>
+        <div class="stat-tile">
+          <span>Trace</span>
+          <strong>{{ traceSteps.length }}</strong>
         </div>
       </div>
     </section>
 
-    <div class="page-grid">
+    <div class="page-grid chat-layout">
       <section class="panel session-panel">
         <div class="panel-header">
           <div>
             <p class="section-kicker">Sessions</p>
             <h3>会话</h3>
           </div>
-          <button class="secondary icon-button" title="刷新" @click="refreshAll">↻</button>
+          <button class="icon-button ghost-button" title="刷新" aria-label="刷新" @click="refreshAll">↻</button>
         </div>
 
-        <div class="form-stack compact">
+        <div class="quick-create">
           <input v-model="newSessionTitle" placeholder="新会话标题" />
           <select v-model="newSessionModelConfigId">
             <option :value="null">使用默认模型</option>
@@ -39,7 +40,7 @@
               {{ item.name }} / {{ item.modelName }}
             </option>
           </select>
-          <button @click="handleCreateSession">新建会话</button>
+          <button class="full-width" @click="handleCreateSession">新建会话</button>
         </div>
 
         <div class="session-list">
@@ -51,9 +52,12 @@
             @click="selectSession(item.sessionId)"
           >
             <strong>{{ item.title }}</strong>
-            <span>模型：{{ item.modelConfigId || '默认' }}</span>
+            <span class="session-meta">模型 {{ item.modelConfigId || '默认' }}</span>
             <time>{{ item.updatedAt }}</time>
           </button>
+          <div v-if="!sessions.length" class="compact-empty">
+            暂无会话
+          </div>
         </div>
       </section>
 
@@ -62,7 +66,7 @@
           <div>
             <p class="section-kicker">Live Analysis</p>
             <h3>{{ activeSessionTitle || '运维对话' }}</h3>
-            <p>真实 LLM + LangChain4j tool calling</p>
+            <p>{{ activeSessionId ? '当前会话已载入' : '选择或新建会话后开始诊断' }}</p>
           </div>
           <div class="inline-actions">
             <select v-model="chatModelConfigId">
@@ -86,7 +90,9 @@
             class="message-card"
             :class="message.role"
           >
-            <div class="message-role">{{ roleLabel(message.role) }}</div>
+            <div class="message-role">
+              <span>{{ roleLabel(message.role) }}</span>
+            </div>
             <pre>{{ message.content }}</pre>
           </div>
         </div>
@@ -110,7 +116,7 @@
         <div class="composer">
           <textarea
             v-model="userInput"
-            placeholder="请输入运维问题，Agent 会自动判断是否调用日志、指标、知识库工具"
+            placeholder="输入故障现象、时间范围、服务名或你已经观察到的异常..."
           />
           <div class="composer-actions">
             <button :disabled="sending || !userInput.trim()" @click="handleSend">
@@ -127,7 +133,7 @@
           <div>
             <p class="section-kicker">Trace</p>
             <h3>执行链路</h3>
-            <p>{{ lastTraceId || '暂无 traceId' }}</p>
+            <p class="trace-id">{{ lastTraceId || '暂无 traceId' }}</p>
           </div>
         </div>
         <div v-if="!traceSteps.length" class="empty-state trace-empty">

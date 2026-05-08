@@ -3,6 +3,7 @@ target/
 frontend/dist/
 
 # Dependencies and local caches
+.codex/
 .m2/
 frontend/node_modules/
 

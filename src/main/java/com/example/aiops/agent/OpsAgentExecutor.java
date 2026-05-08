@@ -15,6 +15,7 @@ import com.example.aiops.tools.KnowledgeSearchTool;
 import com.example.aiops.tools.LogQueryTool;
 import com.example.aiops.tools.MetricsQueryTool;
 import com.example.aiops.util.TraceIdHolder;
+import dev.ai4j.openai4j.OpenAiHttpException;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.service.AiServices;
@@ -84,7 +85,7 @@ public class OpsAgentExecutor implements AgentExecutor {
             try {
                 answer = assistant.analyze(sessionId, userInput);
             } catch (RuntimeException ex) {
-                throw normalizeLlmException(ex);
+                throw normalizeLlmException(ex, llmConfig);
             }
             if (answer == null || answer.isBlank()) {
                 throw new BusinessException(50002, "llm returned empty result");
@@ -108,14 +109,54 @@ public class OpsAgentExecutor implements AgentExecutor {
         }
     }
 
-    private RuntimeException normalizeLlmException(RuntimeException ex) {
-        String message = ex.getMessage();
+    private RuntimeException normalizeLlmException(RuntimeException ex, LlmConfig config) {
+        Throwable root = rootCause(ex);
+        String message = root.getMessage();
         if (message != null && message.contains("AllocationQuota.FreeTierOnly")) {
             return new BusinessException(40023, "Qwen 模型免费额度已用完，当前 API Key 开启了仅使用免费额度模式。请到 DashScope/阿里云百炼控制台关闭“仅使用免费额度”或开通付费额度，也可以切换到其他有额度的模型配置。");
         }
         if (message != null && message.contains("insufficient_quota")) {
             return new BusinessException(40024, "模型调用额度不足，请检查当前模型供应商账号余额、配额或更换有额度的 API Key。");
         }
+        if (root instanceof OpenAiHttpException httpException) {
+            return new BusinessException(40025, describeOpenAiHttpError(httpException, config));
+        }
         return ex;
+    }
+
+    private Throwable rootCause(Throwable ex) {
+        Throwable current = ex;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current;
+    }
+
+    private String describeOpenAiHttpError(OpenAiHttpException ex, LlmConfig config) {
+        String target = "当前配置：" + config.getProvider() + " / " + config.getModelName() + " / " + config.getBaseUrl();
+        return switch (ex.code()) {
+            case 400 -> "模型请求被供应商拒绝（HTTP 400）。常见原因：模型名不支持 OpenAI Chat/工具调用，或请求参数不兼容。建议切换到支持 function calling 的聊天模型，例如 Qwen 的 qwen-plus。"
+                    + targetSuffix(target);
+            case 401 -> "模型调用认证失败（HTTP 401）。请检查当前模型配置的 API Key 是否正确、是否过期。"
+                    + targetSuffix(target);
+            case 403 -> "模型调用无权限（HTTP 403）。请检查账号是否开通该模型、API Key 权限、地域或付费状态。"
+                    + targetSuffix(target);
+            case 404 -> "模型接口或模型名称不存在（HTTP 404）。请检查 Base URL 和模型名是否匹配供应商的 OpenAI 兼容接口。"
+                    + targetSuffix(target);
+            case 429 -> "模型调用被限流或额度不足（HTTP 429）。请检查供应商额度、并发限制或稍后重试。"
+                    + targetSuffix(target);
+            default -> {
+                if (ex.code() >= 500) {
+                    yield "模型供应商服务异常（HTTP " + ex.code() + "），请稍后重试或切换模型配置。"
+                            + targetSuffix(target);
+                }
+                yield "模型调用失败（HTTP " + ex.code() + "）。请检查模型配置、网络和供应商控制台错误详情。"
+                        + targetSuffix(target);
+            }
+        };
+    }
+
+    private String targetSuffix(String target) {
+        return " " + target;
     }
 }
