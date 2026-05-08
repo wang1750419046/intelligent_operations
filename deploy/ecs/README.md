@@ -2,6 +2,11 @@
 
 This directory contains templates for the one-time ECS setup used by `.github/workflows/deploy-ecs.yml`.
 
+The workflow has two modes:
+
+- Push to `master`: build and test only. Nothing is uploaded to ECS.
+- Push a version tag like `v1.0.0`: build again, then deploy that tagged commit to ECS.
+
 ## 1. Prepare the server
 
 Install Java 17, Nginx, MySQL, and Qdrant before the first deploy. The deployment workflow assumes the SSH user is `root`, so create the app directories as root:
@@ -42,7 +47,14 @@ Set these repository secrets:
 - `ECS_SSH_PRIVATE_KEY`: private key for that user
 - `ECS_PORT`: SSH port, optional, defaults to `22`
 
-Push to `master` to deploy code. For config-only changes, edit `/opt/aiops/config/application-prod.yml` on ECS and run the workflow manually from GitHub Actions.
+Push to `master` to validate code with CI. To deploy production, prepare `/opt/aiops/config/application-prod.yml` first, then push a version tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+For config-only changes, edit `/opt/aiops/config/application-prod.yml` on ECS and push a new deployment tag only when you want to redeploy code. If the code version does not change and you only need to reload config, stop and start the Java process manually with the commands below.
 
 ## Manual process control
 
