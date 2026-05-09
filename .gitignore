@@ -1,6 +1,8 @@
 # Build outputs
 target/
 frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
 
 # Dependencies and local caches
 .codex/

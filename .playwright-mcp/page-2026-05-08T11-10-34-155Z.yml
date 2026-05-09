@@ -1,0 +1,82 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e8]:
+      - heading "AIOps Agent" [level=1] [ref=e9]
+      - paragraph [ref=e10]: 智能运维工作台
+    - navigation "主导航" [ref=e11]:
+      - link "运维对话" [ref=e12] [cursor=pointer]:
+        - /url: /chat
+        - generic [ref=e14]: 运维对话
+      - link "模型配置" [ref=e15] [cursor=pointer]:
+        - /url: /models
+        - generic [ref=e17]: 模型配置
+    - generic [ref=e20]: Workspace ready
+  - main [ref=e21]:
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - paragraph [ref=e25]: Command Center
+          - heading "AIOps 运维分析台" [level=2] [ref=e26]
+          - paragraph [ref=e27]: 把告警、日志、指标与知识库收束到同一个诊断上下文。
+        - generic "当前工作区状态" [ref=e28]:
+          - generic [ref=e29]:
+            - generic [ref=e30]: 会话
+            - strong [ref=e31]: "1"
+          - generic [ref=e32]:
+            - generic [ref=e33]: 模型
+            - strong [ref=e34]: "3"
+          - generic [ref=e35]:
+            - generic [ref=e36]: Trace
+            - strong [ref=e37]: "0"
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - paragraph [ref=e42]: Sessions
+              - heading "会话" [level=3] [ref=e43]
+            - button "刷新" [ref=e44] [cursor=pointer]: ↻
+          - generic [ref=e45]:
+            - textbox "新会话标题" [ref=e46]: 线上接口异常分析
+            - combobox [ref=e47]:
+              - option "使用默认模型"
+              - option "OpenAI GPT 默认 / gpt-4.1-mini"
+              - option "Qwen 默认 / qwen-vl-plus-2025-05-07" [selected]
+              - option "MiniMax 默认 / MiniMax-M2.5"
+            - button "新建会话" [ref=e48] [cursor=pointer]
+          - button "根据知识库，回答接口变慢的原因 模型 2 2026-05-07 17:05:10" [active] [ref=e50] [cursor=pointer]:
+            - strong [ref=e51]: 根据知识库，回答接口变慢的原因
+            - generic [ref=e52]: 模型 2
+            - time [ref=e53]: 2026-05-07 17:05:10
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - generic [ref=e56]:
+              - paragraph [ref=e57]: Live Analysis
+              - heading "根据知识库，回答接口变慢的原因" [level=3] [ref=e58]
+              - paragraph [ref=e59]: 当前会话已载入
+            - generic [ref=e60]:
+              - combobox [ref=e61]:
+                - option "使用会话模型或默认模型"
+                - option "OpenAI GPT 默认"
+                - option "Qwen 默认" [selected]
+                - option "MiniMax 默认"
+              - button "删除会话" [ref=e62] [cursor=pointer]
+          - generic [ref=e63]:
+            - generic [ref=e64]:
+              - generic [ref=e66]: 你
+              - generic [ref=e67]: 根据知识库，回答接口变慢的原因
+            - generic [ref=e68]:
+              - generic [ref=e70]: Agent
+              - generic [ref=e71]: "问题描述 用户希望了解接口变慢的原因，并希望通过知识库获取相关信息。 调用证据 - searchKnowledge: {\"query\": \"接口变慢原因\"} 初步判断 根据知识库搜索结果，可以初步判断接口变慢可能与以下因素有关： 1. 服务器负载过高。 2. 网络延迟增加。 3. 数据库查询效率低下。 4. 缓存机制失效或配置不当。 5. 应用程序代码性能瓶颈。 根因分析 最可能原因：服务器负载过高、数据库查询效率低下。 次要可能原因：网络延迟增加、缓存机制失效或配置不当。 仍待确认项：应用程序代码性能瓶颈。 建议动作 1. 检查并监控服务器负载情况，确保资源充足。 2. 分析数据库查询日志，优化SQL语句或调整数据库配置。 3. 检查网络状况，确保网络延迟在合理范围内。 4. 审查缓存配置，确保其有效性和稳定性。 5. 对比应用性能指标，查找是否存在代码层面的性能瓶颈。 风险提示 可能存在服务器资源不足导致的持续高负载问题，以及数据库查询效率低下的潜在瓶颈。此外，网络延迟和缓存机制也可能影响整体响应时间，需要逐一排查以确定具体原因。"
+          - generic [ref=e72]:
+            - textbox "输入故障现象、时间范围、服务名或你已经观察到的异常..." [ref=e73]
+            - generic [ref=e74]:
+              - button "发送给 Agent" [disabled] [ref=e75]
+              - button "查看最近 Trace" [disabled] [ref=e76]
+        - generic [ref=e77]:
+          - generic [ref=e79]:
+            - paragraph [ref=e80]: Trace
+            - heading "执行链路" [level=3] [ref=e81]
+            - paragraph [ref=e82]: 暂无 traceId
+          - generic [ref=e83]:
+            - strong [ref=e84]: 等待 Agent 运行
+            - generic [ref=e85]: 执行后这里会展示工具调用、观察结果和最终输出链路。
