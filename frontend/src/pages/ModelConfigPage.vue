@@ -6,30 +6,74 @@
         <h2>集中管理聊天模型与向量模型接入</h2>
         <p>维护生产分析所需的模型、密钥状态和知识库向量索引。</p>
       </div>
-      <button class="secondary" @click="resetForm">新建配置</button>
     </section>
 
-    <section class="panel vector-status-panel">
-      <div class="panel-header">
+    <div class="segmented-tabs" aria-label="模型类型">
+      <button :class="{ active: activeType === 'CHAT' }" @click="switchType('CHAT')">聊天模型</button>
+      <button :class="{ active: activeType === 'EMBEDDING' }" @click="switchType('EMBEDDING')">向量模型</button>
+      <button :class="{ active: activeType === 'RERANK' }" @click="switchType('RERANK')">Rerank 模型</button>
+    </div>
+
+    <section class="model-section-head">
+      <div>
+        <p class="section-kicker">Providers</p>
+        <h3>{{ activeTypeLabel }}配置</h3>
+      </div>
+      <button @click="openCreateModal">新建配置</button>
+    </section>
+
+    <section class="model-card-grid">
+      <button
+        v-for="item in modelConfigs"
+        :key="item.id"
+        class="panel model-config-card model-config-button"
+        @click="editItem(item)"
+      >
+        <div class="model-card-head">
+          <div>
+            <p class="section-kicker">{{ item.configType || activeType }}</p>
+            <h3>{{ item.name }}</h3>
+          </div>
+          <span :class="['status-pill', item.enabled ? 'good' : 'muted']">
+            {{ item.enabled ? '启用' : '停用' }}
+          </span>
+        </div>
+        <div class="model-card-body">
+          <div>
+            <span>Provider</span>
+            <strong>{{ item.provider }}</strong>
+          </div>
+          <div>
+            <span>Model</span>
+            <strong>{{ item.modelName }}</strong>
+          </div>
+          <div>
+            <span>API Key</span>
+            <strong>{{ displayApiKey(item.apiKey) }}</strong>
+          </div>
+        </div>
+        <p class="model-card-message">
+          <template v-if="item.defaultConfig">默认配置</template>
+          <template v-else>{{ item.updatedAt }}</template>
+        </p>
+      </button>
+
+      <div v-if="!modelConfigs.length" class="panel compact-empty">
+        暂无{{ activeTypeLabel }}配置
+      </div>
+    </section>
+
+    <section v-if="activeType === 'EMBEDDING'" class="panel vector-index-panel">
+      <div class="model-card-head">
         <div>
           <p class="section-kicker">Vector Index</p>
-          <h3>知识库向量索引</h3>
-          <p>{{ vectorStatus.message || '等待状态检查' }}</p>
+          <h3>Qdrant 向量数据库</h3>
         </div>
-        <div class="inline-actions">
-          <button class="secondary" @click="loadVectorStatus">刷新状态</button>
-          <button :disabled="reindexing" @click="handleReindex">
-            {{ reindexing ? '重建中...' : '重建索引' }}
-          </button>
-        </div>
+        <span :class="['status-pill', vectorStatus.qdrantReachable ? 'good' : 'muted']">
+          {{ vectorStatus.qdrantReachable ? '已连接' : '未就绪' }}
+        </span>
       </div>
-      <div class="status-grid">
-        <div>
-          <span>Qdrant</span>
-          <strong :class="vectorStatus.qdrantReachable ? 'good-text' : 'muted-text'">
-            {{ vectorStatus.qdrantReachable ? '已连接' : '未就绪' }}
-          </strong>
-        </div>
+      <div class="model-card-body">
         <div>
           <span>Collection</span>
           <strong>{{ vectorStatus.collection || 'aiops_knowledge_v1' }}</strong>
@@ -43,60 +87,33 @@
           <strong>{{ vectorStatus.indexedCount ?? '-' }}</strong>
         </div>
       </div>
-      <div v-if="reindexResult" class="result-box">{{ reindexResult }}</div>
+      <p class="model-card-message">{{ reindexResult || vectorStatus.message || '等待状态检查' }}</p>
+      <div class="inline-actions">
+        <button class="secondary" @click="loadVectorStatus">刷新状态</button>
+        <button :disabled="reindexing" @click="handleReindex">
+          {{ reindexing ? '重建中...' : '重建索引' }}
+        </button>
+      </div>
     </section>
 
-    <div class="segmented-tabs" aria-label="模型类型">
-      <button :class="{ active: activeType === 'CHAT' }" @click="switchType('CHAT')">聊天模型</button>
-      <button :class="{ active: activeType === 'EMBEDDING' }" @click="switchType('EMBEDDING')">向量模型</button>
-    </div>
-
-    <div class="dual-grid config-layout">
-      <section class="panel config-list-pane">
-        <div class="panel-header">
-          <div>
-            <p class="section-kicker">Providers</p>
-            <h3>{{ activeType === 'CHAT' ? '聊天模型列表' : '向量模型列表' }}</h3>
-          </div>
-        </div>
-
-        <div class="model-list">
-          <button
-            v-for="item in modelConfigs"
-            :key="item.id"
-            class="session-card model-card"
-            :class="{ active: form.id === item.id }"
-            @click="editItem(item)"
-          >
-            <strong>{{ item.name }}</strong>
-            <span>{{ item.provider }} / {{ item.modelName }}</span>
-            <span>
-              <template v-if="item.defaultConfig">默认配置</template>
-              <template v-else>{{ item.updatedAt }}</template>
-            </span>
-          </button>
-          <div v-if="!modelConfigs.length" class="compact-empty">
-            暂无模型配置
-          </div>
-        </div>
-      </section>
-
-      <section class="panel config-form-pane">
-        <div class="panel-header">
+    <div v-if="activeModal" class="modal-backdrop" @click.self="closeModal">
+      <section class="modal-panel model-modal">
+        <div class="modal-header">
           <div>
             <p class="section-kicker">Connection</p>
             <h3>{{ form.id ? '编辑配置' : '新建配置' }}</h3>
           </div>
+          <button class="icon-button ghost-button" title="关闭" aria-label="关闭" @click="closeModal">×</button>
         </div>
 
-        <div class="form-stack">
+        <div class="form-stack modal-body">
           <label>
             <span>配置名称</span>
             <input v-model="form.name" placeholder="例如：生产 Qwen Plus" />
           </label>
           <label>
             <span>模型服务商</span>
-            <select v-model="form.provider" :disabled="activeType === 'EMBEDDING'" @change="applyPreset">
+            <select v-model="form.provider" :disabled="activeType !== 'CHAT'" @change="applyPreset">
               <option value="OPENAI">GPT / OpenAI</option>
               <option value="QWEN">Qwen / DashScope</option>
               <option value="MINIMAX">MiniMax</option>
@@ -108,11 +125,12 @@
           </label>
           <label>
             <span>模型名称</span>
-            <input v-model="form.modelName" :disabled="activeType === 'EMBEDDING'" placeholder="模型名称" />
+            <input v-model="form.modelName" placeholder="模型名称" />
           </label>
           <label>
             <span>API Key</span>
             <input v-model="form.apiKey" type="password" placeholder="留空则保留已有 API Key" />
+            <span class="field-hint">当前 API Key: {{ displayApiKey(form.apiKeyPreview) }}</span>
           </label>
 
           <div v-if="activeType === 'CHAT'" class="split-fields">
@@ -133,18 +151,20 @@
             </label>
             <label class="checkbox-line">
               <input v-model="form.defaultConfig" type="checkbox" />
-              <span>设为默认{{ activeType === 'CHAT' ? '聊天' : '向量' }}模型</span>
+              <span>设为默认{{ activeTypeLabel }}</span>
             </label>
           </div>
-
-          <div class="inline-actions">
-            <button @click="save">保存</button>
-            <button class="secondary" :disabled="!form.id" @click="test">
-              {{ activeType === 'CHAT' ? '测试连接' : '测试向量模型' }}
-            </button>
-            <button class="danger" :disabled="!form.id" @click="remove">删除</button>
-          </div>
           <div v-if="testResult" class="result-box">{{ testResult }}</div>
+        </div>
+
+        <div class="modal-actions model-modal-actions">
+          <button class="danger" :disabled="!form.id" @click="remove">删除</button>
+          <span></span>
+          <button class="secondary" :disabled="!form.id" @click="test">
+            {{ activeType === 'CHAT' ? '测试连接' : activeType === 'EMBEDDING' ? '测试向量模型' : '测试 Rerank' }}
+          </button>
+          <button class="secondary" @click="closeModal">取消</button>
+          <button @click="save">保存</button>
         </div>
       </section>
     </div>
@@ -152,7 +172,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import {
   createModelConfig,
   deleteModelConfig,
@@ -174,12 +194,24 @@ const embeddingPreset = {
   modelName: 'text-embedding-v3',
 }
 
+const rerankPreset = {
+  provider: 'QWEN',
+  baseUrl: 'https://dashscope.aliyuncs.com/compatible-api/v1',
+  modelName: 'qwen3-rerank',
+}
+
 const activeType = ref('CHAT')
+const activeTypeLabel = computed(() => {
+  if (activeType.value === 'EMBEDDING') return '向量模型'
+  if (activeType.value === 'RERANK') return 'Rerank 模型'
+  return '聊天模型'
+})
 const modelConfigs = ref([])
 const testResult = ref('')
 const reindexResult = ref('')
 const reindexing = ref(false)
 const vectorStatus = ref({})
+const activeModal = ref('')
 
 const emptyForm = () => {
   if (activeType.value === 'EMBEDDING') {
@@ -191,6 +223,23 @@ const emptyForm = () => {
       baseUrl: embeddingPreset.baseUrl,
       modelName: embeddingPreset.modelName,
       apiKey: '',
+      apiKeyPreview: null,
+      temperature: 0.2,
+      maxTokens: null,
+      enabled: true,
+      defaultConfig: true,
+    }
+  }
+  if (activeType.value === 'RERANK') {
+    return {
+      id: null,
+      name: 'Qwen Rerank',
+      configType: 'RERANK',
+      provider: rerankPreset.provider,
+      baseUrl: rerankPreset.baseUrl,
+      modelName: rerankPreset.modelName,
+      apiKey: '',
+      apiKeyPreview: null,
       temperature: 0.2,
       maxTokens: null,
       enabled: true,
@@ -205,6 +254,7 @@ const emptyForm = () => {
     baseUrl: chatPresets.OPENAI.baseUrl,
     modelName: chatPresets.OPENAI.modelName,
     apiKey: '',
+    apiKeyPreview: null,
     temperature: 0.2,
     maxTokens: 4096,
     enabled: true,
@@ -218,8 +268,11 @@ const loadData = async () => {
   try {
     const response = await listModelConfigs(activeType.value)
     modelConfigs.value = response.data || []
+    return true
   } catch (error) {
+    modelConfigs.value = []
     testResult.value = error.message
+    return false
   }
 }
 
@@ -237,6 +290,15 @@ const resetForm = () => {
   testResult.value = ''
 }
 
+const openCreateModal = () => {
+  resetForm()
+  activeModal.value = 'model'
+}
+
+const closeModal = () => {
+  activeModal.value = ''
+}
+
 const switchType = async (type) => {
   activeType.value = type
   resetForm()
@@ -246,6 +308,10 @@ const switchType = async (type) => {
 const applyPreset = () => {
   if (activeType.value === 'EMBEDDING') {
     Object.assign(form, embeddingPreset)
+    return
+  }
+  if (activeType.value === 'RERANK') {
+    Object.assign(form, rerankPreset)
     return
   }
   const preset = chatPresets[form.provider]
@@ -262,21 +328,25 @@ const editItem = (item) => {
     baseUrl: item.baseUrl,
     modelName: item.modelName,
     apiKey: '',
+    apiKeyPreview: item.apiKey,
     temperature: item.temperature,
     maxTokens: item.maxTokens,
     enabled: item.enabled,
     defaultConfig: item.defaultConfig,
   })
   testResult.value = item.hasApiKey ? '当前配置已保存 API Key' : '当前配置尚未保存 API Key'
+  activeModal.value = 'model'
 }
+
+const displayApiKey = (apiKey) => apiKey ?? 'null'
 
 const save = async () => {
   const payload = {
     name: form.name,
     configType: activeType.value,
-    provider: activeType.value === 'EMBEDDING' ? embeddingPreset.provider : form.provider,
+    provider: activeType.value === 'EMBEDDING' ? embeddingPreset.provider : activeType.value === 'RERANK' ? rerankPreset.provider : form.provider,
     baseUrl: form.baseUrl,
-    modelName: activeType.value === 'EMBEDDING' ? embeddingPreset.modelName : form.modelName,
+    modelName: form.modelName,
     temperature: form.temperature,
     maxTokens: activeType.value === 'CHAT' ? form.maxTokens : null,
     enabled: form.enabled,
@@ -294,6 +364,7 @@ const save = async () => {
     await loadData()
     await loadVectorStatus()
     resetForm()
+    closeModal()
   } catch (error) {
     testResult.value = error.message
   }
@@ -316,6 +387,7 @@ const remove = async () => {
     await loadData()
     await loadVectorStatus()
     resetForm()
+    closeModal()
   } catch (error) {
     testResult.value = error.message
   }

@@ -229,6 +229,24 @@ textarea {
   background: currentColor;
 }
 
+.nav-icon-knowledge::before {
+  top: 5px;
+  left: 6px;
+  width: 12px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+}
+
+.nav-icon-knowledge::after {
+  left: 9px;
+  top: 10px;
+  width: 7px;
+  height: 2px;
+  background: currentColor;
+  box-shadow: 0 4px 0 currentColor;
+}
+
 .nav-link.router-link-active {
   background: #eef2f6;
   color: #0f172a;
@@ -264,7 +282,8 @@ textarea {
 }
 
 .chat-workspace,
-.config-workspace {
+.config-workspace,
+.knowledge-workspace {
   max-width: 1680px;
   margin: 0 auto;
   display: flex;
@@ -273,7 +292,9 @@ textarea {
 }
 
 .chat-workspace {
-  min-height: calc(100vh - 44px);
+  height: calc(100vh - 44px);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .chat-workspace .workspace-topbar {
@@ -372,7 +393,8 @@ textarea {
 .chat-layout {
   flex: 1;
   min-height: 0;
-  grid-template-columns: minmax(248px, 282px) minmax(520px, 1fr) minmax(260px, 320px);
+  align-items: stretch;
+  grid-template-columns: minmax(230px, 260px) minmax(760px, 1fr) minmax(240px, 280px);
   grid-template-areas: "sessions chat trace";
 }
 
@@ -412,6 +434,14 @@ textarea {
   top: 22px;
 }
 
+.chat-workspace .session-panel,
+.chat-workspace .trace-panel {
+  position: static;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
 .panel-header {
   display: flex;
   align-items: flex-start;
@@ -436,6 +466,7 @@ textarea {
 
 .chat-header {
   align-items: center;
+  margin-bottom: 10px;
 }
 
 .form-stack,
@@ -458,6 +489,12 @@ textarea {
   color: #344054;
   font-size: 13px;
   font-weight: 800;
+}
+
+.field-hint {
+  color: #697589;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .inline-actions,
@@ -543,6 +580,145 @@ textarea {
   font-size: 12px;
 }
 
+.model-api-key {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  overflow-wrap: anywhere;
+}
+
+.model-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.model-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+
+.model-section-head h3 {
+  margin: 3px 0 0;
+  color: #111827;
+  font-size: 19px;
+  line-height: 1.25;
+}
+
+.model-config-card {
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.model-config-button {
+  width: 100%;
+  text-align: left;
+  color: #172033;
+  background: #fff;
+  border-color: #dbe3ee;
+  box-shadow: 0 14px 36px rgba(26, 39, 62, 0.06);
+}
+
+.model-config-button:hover:not(:disabled) {
+  background: #f8fbfc;
+  border-color: #9ac9c5;
+  box-shadow: 0 16px 38px rgba(26, 39, 62, 0.08);
+}
+
+.model-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.model-card-head h3 {
+  margin: 4px 0 0;
+  color: #111827;
+  font-size: 18px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.status-pill {
+  flex: 0 0 auto;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.status-pill.good {
+  color: #0b746f;
+  background: #e8f7f4;
+  border: 1px solid #b9ded9;
+}
+
+.status-pill.muted {
+  color: #697589;
+  background: #f3f6fa;
+  border: 1px solid #dfe7f1;
+}
+
+.model-card-body {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.model-card-body div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.model-card-body span {
+  display: block;
+  color: #697589;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.model-card-body strong {
+  display: block;
+  margin-top: 5px;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.model-card-message {
+  margin: auto 0 0;
+  color: #697589;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.vector-index-panel {
+  border-color: #cce4df;
+  background: #f9fdfc;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.model-modal {
+  width: min(760px, 100%);
+}
+
+.model-modal-actions {
+  grid-template-columns: auto 1fr auto auto auto;
+}
+
 .session-meta {
   color: #0b746f !important;
   font-weight: 800;
@@ -553,29 +729,35 @@ textarea {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: calc(100vh - 164px);
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  padding: 18px 20px;
 }
 
 .chat-log {
-  flex: 1;
-  min-height: 240px;
+  flex: 1 1 auto;
+  min-height: 260px;
   max-height: none;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   padding: 2px 4px 10px 0;
 }
 
 .message-card {
-  max-width: min(82%, 780px);
-  padding: 13px 14px;
+  width: 100%;
+  max-width: 100%;
+  padding: 16px 18px;
   border-radius: 8px;
   border: 1px solid #dfe7f1;
   background: #fff;
 }
 
 .message-card.user {
+  width: auto;
+  max-width: min(72%, 720px);
   align-self: flex-end;
   background: #eefaf8;
   border-color: #b9ded9;
@@ -584,6 +766,7 @@ textarea {
 .message-card.assistant {
   align-self: flex-start;
   background: #f9fbfd;
+  border-color: #dbe3ee;
 }
 
 .message-card pre,
@@ -591,8 +774,14 @@ textarea {
   margin: 8px 0 0;
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
   font-family: inherit;
   line-height: 1.6;
+}
+
+.message-card.assistant pre {
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .message-role {
@@ -608,30 +797,49 @@ textarea {
 }
 
 .composer {
-  margin-top: 12px;
-  padding-top: 14px;
+  flex: 0 0 auto;
+  margin-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid #e4eaf2;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
+.composer textarea {
+  min-height: 96px;
+  resize: none;
+}
+
 .reference-panel {
-  margin-top: 12px;
-  padding-top: 14px;
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: 150px;
+  margin-top: 8px;
+  padding-top: 10px;
   border-top: 1px solid #e4eaf2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.reference-panel .panel-header {
+  margin-bottom: 8px;
 }
 
 .reference-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .reference-item {
   border: 1px solid #d1e8e4;
   border-radius: 8px;
   background: #f7fbfb;
-  padding: 12px;
+  padding: 10px 12px;
 }
 
 .reference-item strong {
@@ -652,6 +860,9 @@ textarea {
   margin: 8px 0 0;
   color: #344054;
   line-height: 1.55;
+  overflow-wrap: anywhere;
+  max-height: 4.8em;
+  overflow-y: auto;
 }
 
 .empty-state,
@@ -683,6 +894,11 @@ textarea {
 
 .trace-empty {
   min-height: 220px;
+}
+
+.trace-panel {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .trace-id {
@@ -844,21 +1060,145 @@ textarea {
   color: #697589 !important;
 }
 
+.knowledge-layout {
+  min-width: 0;
+}
+
+.knowledge-list-pane,
+.knowledge-editor-pane,
+.import-pane {
+  min-width: 0;
+}
+
+.knowledge-list-pane {
+  min-height: calc(100vh - 194px);
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(120px, 1fr)) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.filter-grid button {
+  min-width: 86px;
+}
+
+.knowledge-filter-bar {
+  padding: 12px;
+}
+
+.document-list {
+  max-height: calc(100vh - 330px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 2px;
+}
+
+.knowledge-card {
+  min-height: 92px;
+}
+
+.knowledge-editor-pane textarea,
+.knowledge-editor-pane textarea {
+  min-height: 150px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.modal-panel {
+  width: min(880px, 100%);
+  max-height: calc(100vh - 64px);
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.import-modal {
+  width: min(720px, 100%);
+}
+
+.modal-header {
+  flex: 0 0 auto;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #e4eaf2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal-header h3 {
+  margin: 3px 0 0;
+  color: #111827;
+  font-size: 19px;
+  line-height: 1.25;
+}
+
+.modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 20px;
+}
+
+.knowledge-modal textarea {
+  min-height: 260px;
+  resize: vertical;
+}
+
+.modal-actions {
+  flex: 0 0 auto;
+  padding: 14px 20px;
+  border-top: 1px solid #e4eaf2;
+  background: #f8fafc;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.import-modal .modal-actions {
+  grid-template-columns: 1fr auto auto;
+}
+
 @media (max-width: 1320px) {
   .dual-grid,
-  .config-layout {
+  .config-layout,
+  .knowledge-layout {
     grid-template-columns: 1fr;
   }
 
   .chat-workspace {
+    height: auto;
     min-height: 0;
+    overflow: visible;
   }
 
   .chat-layout {
+    align-items: start;
     grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
     grid-template-areas:
       "chat chat"
       "sessions trace";
+  }
+
+  .filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .chat-panel {
@@ -920,6 +1260,8 @@ textarea {
   .chat-panel {
     height: auto;
     min-height: 0;
+    max-height: none;
+    overflow: visible;
   }
 
   .chat-log {
@@ -1012,7 +1354,8 @@ textarea {
   }
 
   .split-fields,
-  .status-grid {
+  .status-grid,
+  .filter-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -9,6 +9,7 @@ public class ModelConfigResponse {
     private String provider;
     private String configType;
     private String baseUrl;
+    private String apiKey;
     private String modelName;
     private BigDecimal temperature;
     private Integer maxTokens;
@@ -55,6 +56,14 @@ public class ModelConfigResponse {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
     }
 
     public String getModelName() {

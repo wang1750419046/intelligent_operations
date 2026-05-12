@@ -33,8 +33,7 @@
         </div>
 
         <div class="quick-create">
-          <input v-model="newSessionTitle" placeholder="新会话标题" />
-          <select v-model="newSessionModelConfigId">
+          <select v-model="chatModelConfigId">
             <option :value="null">使用默认模型</option>
             <option v-for="item in modelConfigs" :key="item.id" :value="item.id">
               {{ item.name }} / {{ item.modelName }}
@@ -69,12 +68,6 @@
             <p>{{ activeSessionId ? '当前会话已载入' : '选择或新建会话后开始诊断' }}</p>
           </div>
           <div class="inline-actions">
-            <select v-model="chatModelConfigId">
-              <option :value="null">使用会话模型或默认模型</option>
-              <option v-for="item in modelConfigs" :key="item.id" :value="item.id">
-                {{ item.name }}
-              </option>
-            </select>
             <button class="secondary" :disabled="!activeSessionId" @click="removeSession">删除会话</button>
           </div>
         </div>
@@ -172,8 +165,6 @@ const lastReferences = ref([])
 const sending = ref(false)
 const errorMessage = ref('')
 const userInput = ref('')
-const newSessionTitle = ref('线上接口异常分析')
-const newSessionModelConfigId = ref(null)
 const chatModelConfigId = ref(null)
 
 const roleLabel = (role) => {
@@ -195,7 +186,6 @@ const loadModelConfigs = async () => {
       || modelConfigs.value.find((item) => item.hasApiKey)
     if (readyConfig) {
       chatModelConfigId.value = readyConfig.id
-      newSessionModelConfigId.value = readyConfig.id
     }
   }
 }
@@ -213,8 +203,8 @@ const selectSession = async (sessionId) => {
 
 const handleCreateSession = async () => {
   const response = await createSession({
-    title: newSessionTitle.value || 'New AIOps Session',
-    modelConfigId: newSessionModelConfigId.value,
+    title: '新建运维会话',
+    modelConfigId: chatModelConfigId.value,
   })
   await loadSessions()
   await selectSession(response.data.sessionId)
@@ -224,10 +214,10 @@ const ensureSession = async () => {
   if (activeSessionId.value) {
     return activeSessionId.value
   }
-  const title = userInput.value.trim().slice(0, 30) || newSessionTitle.value || 'New AIOps Session'
+  const title = userInput.value.trim().slice(0, 30) || '新建运维会话'
   const response = await createSession({
     title,
-    modelConfigId: chatModelConfigId.value || newSessionModelConfigId.value,
+    modelConfigId: chatModelConfigId.value,
   })
   await loadSessions()
   await selectSession(response.data.sessionId)

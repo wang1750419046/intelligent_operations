@@ -16,6 +16,10 @@
           <span class="nav-icon nav-icon-chat" aria-hidden="true"></span>
           <span>运维对话</span>
         </RouterLink>
+        <RouterLink to="/knowledge" class="nav-link">
+          <span class="nav-icon nav-icon-knowledge" aria-hidden="true"></span>
+          <span>知识库</span>
+        </RouterLink>
         <RouterLink to="/models" class="nav-link">
           <span class="nav-icon nav-icon-model" aria-hidden="true"></span>
           <span>模型配置</span>

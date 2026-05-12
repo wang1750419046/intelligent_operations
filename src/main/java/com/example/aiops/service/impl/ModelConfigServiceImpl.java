@@ -7,6 +7,7 @@ import com.example.aiops.entity.LlmConfig;
 import com.example.aiops.exception.BusinessException;
 import com.example.aiops.mapper.LlmConfigMapper;
 import com.example.aiops.rag.QwenEmbeddingService;
+import com.example.aiops.rag.QwenRerankService;
 import com.example.aiops.service.ModelConfigService;
 import com.example.aiops.util.TimeUtils;
 import dev.ai4j.openai4j.OpenAiHttpException;
@@ -24,13 +25,16 @@ public class ModelConfigServiceImpl implements ModelConfigService {
     private final LlmConfigMapper llmConfigMapper;
     private final ChatModelFactory chatModelFactory;
     private final QwenEmbeddingService qwenEmbeddingService;
+    private final QwenRerankService qwenRerankService;
 
     public ModelConfigServiceImpl(LlmConfigMapper llmConfigMapper,
                                   ChatModelFactory chatModelFactory,
-                                  QwenEmbeddingService qwenEmbeddingService) {
+                                  QwenEmbeddingService qwenEmbeddingService,
+                                  QwenRerankService qwenRerankService) {
         this.llmConfigMapper = llmConfigMapper;
         this.chatModelFactory = chatModelFactory;
         this.qwenEmbeddingService = qwenEmbeddingService;
+        this.qwenRerankService = qwenRerankService;
     }
 
     @Override
@@ -86,6 +90,14 @@ public class ModelConfigServiceImpl implements ModelConfigService {
             if ("EMBEDDING".equalsIgnoreCase(config.getConfigType())) {
                 int dimensions = qwenEmbeddingService.embed("AIOps embedding connection test", config).size();
                 return new ModelConfigTestResponse(true, "连接成功，向量维度: " + dimensions);
+            }
+            if ("RERANK".equalsIgnoreCase(config.getConfigType())) {
+                int resultCount = qwenRerankService.rerank(
+                        "database timeout",
+                        List.of("connection pool timeout runbook", "frontend style guide"),
+                        1,
+                        config).size();
+                return new ModelConfigTestResponse(true, "Rerank connection success, result count " + resultCount);
             }
             ChatLanguageModel model = chatModelFactory.create(config);
             String reply = model.generate("请只回复 OK");
@@ -144,6 +156,7 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         response.setProvider(config.getProvider());
         response.setConfigType(config.getConfigType());
         response.setBaseUrl(config.getBaseUrl());
+        response.setApiKey(maskApiKey(config.getApiKey()));
         response.setModelName(config.getModelName());
         response.setTemperature(config.getTemperature());
         response.setMaxTokens(config.getMaxTokens());
@@ -152,6 +165,13 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         response.setHasApiKey(config.getApiKey() != null && !config.getApiKey().isBlank());
         response.setUpdatedAt(TimeUtils.format(config.getUpdatedAt()));
         return response;
+    }
+
+    private String maskApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return null;
+        }
+        return "******";
     }
 
     private String normalizeLlmError(Exception ex, LlmConfig config) {
@@ -199,6 +219,9 @@ public class ModelConfigServiceImpl implements ModelConfigService {
             return "CHAT";
         }
         String normalized = configType.trim().toUpperCase(Locale.ROOT);
-        return "EMBEDDING".equals(normalized) ? "EMBEDDING" : "CHAT";
+        if ("EMBEDDING".equals(normalized) || "RERANK".equals(normalized)) {
+            return normalized;
+        }
+        return "CHAT";
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -43,6 +44,7 @@ class ModelConfigControllerIntegrationTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("自定义 GPT"))
+                .andExpect(jsonPath("$.data.apiKey").value("******"))
                 .andExpect(jsonPath("$.data.hasApiKey").value(true));
     }
 
@@ -95,6 +97,6 @@ class ModelConfigControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].configType").value("EMBEDDING"))
                 .andExpect(jsonPath("$.data[0].modelName").value("text-embedding-v3"))
-                .andExpect(jsonPath("$.data[0].apiKey").doesNotExist());
+                .andExpect(jsonPath("$.data[0].apiKey").value(nullValue()));
     }
 }

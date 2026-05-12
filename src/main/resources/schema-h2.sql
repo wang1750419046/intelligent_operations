@@ -40,8 +40,35 @@ CREATE TABLE IF NOT EXISTS knowledge_document (
     content CLOB NOT NULL,
     source VARCHAR(128) NOT NULL,
     tags VARCHAR(255) NULL,
+    filename VARCHAR(255) NULL,
+    mime_type VARCHAR(128) NULL,
+    country VARCHAR(64) NULL,
+    business_line VARCHAR(128) NULL,
+    system_name VARCHAR(128) NULL,
+    event_time TIMESTAMP NULL,
+    permission_codes VARCHAR(512) NULL,
+    content_hash VARCHAR(64) NULL,
+    index_status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
     embedding_status VARCHAR(32) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_chunk (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    chunk_id VARCHAR(96) NOT NULL UNIQUE,
+    doc_id VARCHAR(64) NOT NULL,
+    chunk_index INT NOT NULL,
+    section_path VARCHAR(512) NULL,
+    chunk_content CLOB NOT NULL,
+    content_hash VARCHAR(64) NOT NULL,
+    embedding_status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    embedding_model VARCHAR(128) NULL,
+    indexed_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_knowledge_chunk_doc (doc_id),
+    INDEX idx_knowledge_chunk_status (embedding_status)
 );
 
 CREATE TABLE IF NOT EXISTS llm_config (

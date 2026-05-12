@@ -71,6 +71,10 @@ public interface LlmConfigMapper {
     @ResultMap("llmConfigMap")
     LlmConfig findActiveEmbedding();
 
+    @Select("SELECT * FROM llm_config WHERE config_type = 'RERANK' AND enabled = 1 ORDER BY is_default DESC, updated_at DESC, id DESC LIMIT 1")
+    @ResultMap("llmConfigMap")
+    LlmConfig findActiveRerank();
+
     @Update("UPDATE llm_config SET is_default = 0 WHERE config_type = #{configType}")
     int clearDefaultFlag(@Param("configType") String configType);
 

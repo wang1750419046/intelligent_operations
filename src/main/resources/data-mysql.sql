@@ -1,13 +1,13 @@
-INSERT INTO knowledge_document (doc_id, title, content, source, tags, embedding_status)
-SELECT 'kb-001', '数据库连接池耗尽排查', '当 RT 持续升高且日志出现 connection timeout 时，优先检查连接池配置、慢 SQL 与数据库负载。', 'wiki', 'database,timeout,rt', 'READY'
+INSERT INTO knowledge_document (doc_id, title, content, source, tags, permission_codes, index_status, embedding_status)
+SELECT 'kb-001', '数据库连接池耗尽排查', '当 RT 持续升高且日志出现 connection timeout 时，优先检查连接池配置、慢 SQL 与数据库负载。', 'wiki', 'database,timeout,rt', 'PUBLIC', 'READY', 'READY'
 WHERE NOT EXISTS (SELECT 1 FROM knowledge_document WHERE doc_id = 'kb-001');
 
-INSERT INTO knowledge_document (doc_id, title, content, source, tags, embedding_status)
-SELECT 'kb-002', '发布后接口变慢复盘模板', '若异常时间与发布窗口重叠，需要检查变更内容、线程池参数与下游依赖版本。', 'postmortem', 'release,latency,dependency', 'READY'
+INSERT INTO knowledge_document (doc_id, title, content, source, tags, permission_codes, index_status, embedding_status)
+SELECT 'kb-002', '发布后接口变慢复盘模板', '若异常时间与发布窗口重叠，需要检查变更内容、线程池参数与下游依赖版本。', 'postmortem', 'release,latency,dependency', 'PUBLIC', 'READY', 'READY'
 WHERE NOT EXISTS (SELECT 1 FROM knowledge_document WHERE doc_id = 'kb-002');
 
-INSERT INTO knowledge_document (doc_id, title, content, source, tags, embedding_status)
-SELECT 'kb-003', '线程池耗尽处理手册', '若日志存在 RejectedExecutionException 或 queue full，说明业务线程池可能耗尽。', 'runbook', 'threadpool,queue,reject', 'READY'
+INSERT INTO knowledge_document (doc_id, title, content, source, tags, permission_codes, index_status, embedding_status)
+SELECT 'kb-003', '线程池耗尽处理手册', '若日志存在 RejectedExecutionException 或 queue full，说明业务线程池可能耗尽。', 'runbook', 'threadpool,queue,reject', 'PUBLIC', 'READY', 'READY'
 WHERE NOT EXISTS (SELECT 1 FROM knowledge_document WHERE doc_id = 'kb-003');
 
 INSERT INTO llm_config (name, provider, config_type, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
@@ -25,3 +25,7 @@ WHERE NOT EXISTS (SELECT 1 FROM llm_config WHERE name = 'MiniMax 默认');
 INSERT INTO llm_config (name, provider, config_type, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
 SELECT 'Qwen Embedding 默认', 'QWEN', 'EMBEDDING', 'https://dashscope.aliyuncs.com/compatible-mode/v1', '', 'text-embedding-v3', 0.20, NULL, 1, 1
 WHERE NOT EXISTS (SELECT 1 FROM llm_config WHERE name = 'Qwen Embedding 默认');
+
+INSERT INTO llm_config (name, provider, config_type, base_url, api_key, model_name, temperature, max_tokens, enabled, is_default)
+SELECT 'Qwen Rerank 默认', 'QWEN', 'RERANK', 'https://dashscope.aliyuncs.com/compatible-api/v1', '', 'qwen3-rerank', 0.20, NULL, 1, 1
+WHERE NOT EXISTS (SELECT 1 FROM llm_config WHERE name = 'Qwen Rerank 默认');
