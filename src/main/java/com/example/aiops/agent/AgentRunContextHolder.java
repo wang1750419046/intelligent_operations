@@ -2,7 +2,7 @@ package com.example.aiops.agent;
 
 public final class AgentRunContextHolder {
 
-    private static final ThreadLocal<AgentRunContext> CONTEXT = new ThreadLocal<>();
+    private static final ThreadLocal<AgentRunContext> CONTEXT = new InheritableThreadLocal<>();
 
     private AgentRunContextHolder() {
     }

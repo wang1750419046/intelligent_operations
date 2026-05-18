@@ -12,7 +12,7 @@ class QwenRerankServiceTest {
 
     @Test
     void shouldParseRerankResults() {
-        QwenRerankService service = new QwenRerankService(RestClient.builder());
+        QwenRerankService service = new QwenRerankService(RestClient.builder(), 2000);
 
         List<RerankResult> results = service.parseResults(Map.of(
                 "results", List.of(

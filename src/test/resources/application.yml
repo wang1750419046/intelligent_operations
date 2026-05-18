@@ -16,8 +16,17 @@ mybatis:
   type-aliases-package: com.example.aiops.entity
 
 aiops:
+  agent:
+    progress-events:
+      enabled: true
   llm:
     timeout-seconds: 30
+  rag:
+    query-rewrite:
+      enabled: false
+    rerank:
+      enabled: false
+    remote-timeout-ms: 2000
   memory:
     max-history-messages: 10
   cors:

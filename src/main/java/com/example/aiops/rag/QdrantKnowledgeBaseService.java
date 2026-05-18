@@ -1,9 +1,14 @@
 package com.example.aiops.rag;
 
+import com.example.aiops.agent.AgentRunContext;
+import com.example.aiops.agent.AgentRunContextHolder;
 import com.example.aiops.entity.KnowledgeChunk;
 import com.example.aiops.entity.KnowledgeDocument;
 import com.example.aiops.entity.LlmConfig;
 import com.example.aiops.mapper.KnowledgeChunkMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -21,6 +26,7 @@ import java.util.stream.Collectors;
 @ConditionalOnProperty(prefix = "aiops.vector", name = "enabled", havingValue = "true")
 public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
 
+    private static final Logger log = LoggerFactory.getLogger(QdrantKnowledgeBaseService.class);
     private static final int RECALL_LIMIT = 50;
 
     private final EmbeddingConfigResolver embeddingConfigResolver;
@@ -31,6 +37,8 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
     private final KnowledgeChunkMapper knowledgeChunkMapper;
     private final InMemoryKnowledgeBaseService fallbackService;
     private final QueryRewriteService queryRewriteService;
+    private final boolean rerankEnabled;
+    private final long remoteTimeoutMs;
 
     public QdrantKnowledgeBaseService(EmbeddingConfigResolver embeddingConfigResolver,
                                       RerankConfigResolver rerankConfigResolver,
@@ -39,7 +47,9 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
                                       QdrantKnowledgeVectorStore vectorStore,
                                       KnowledgeChunkMapper knowledgeChunkMapper,
                                       InMemoryKnowledgeBaseService fallbackService,
-                                      QueryRewriteService queryRewriteService) {
+                                      QueryRewriteService queryRewriteService,
+                                      @Value("${aiops.rag.rerank.enabled:false}") boolean rerankEnabled,
+                                      @Value("${aiops.rag.remote-timeout-ms:2000}") long remoteTimeoutMs) {
         this.embeddingConfigResolver = embeddingConfigResolver;
         this.rerankConfigResolver = rerankConfigResolver;
         this.embeddingService = embeddingService;
@@ -48,6 +58,8 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
         this.knowledgeChunkMapper = knowledgeChunkMapper;
         this.fallbackService = fallbackService;
         this.queryRewriteService = queryRewriteService;
+        this.rerankEnabled = rerankEnabled;
+        this.remoteTimeoutMs = remoteTimeoutMs;
     }
 
     @Override
@@ -57,19 +69,27 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
 
     @Override
     public List<KnowledgeDocument> search(KnowledgeSearchCriteria criteria) {
+        long startNanos = System.nanoTime();
         try {
+            long rewriteStart = System.nanoTime();
             RewrittenQuery rewritten = queryRewriteService.rewrite(criteria.getQuery());
+            publishSegment("knowledge_query_rewrite", "知识库查询改写完成", rewriteStart);
             KnowledgeSearchCriteria effective = mergeCriteria(criteria, rewritten);
             List<KnowledgeChunk> candidates = recallCandidates(effective, rewritten);
             if (candidates.isEmpty()) {
+                log.info("Knowledge search falling back to local documents, query={}, elapsedMs={}", criteria.getQuery(), elapsedMs(startNanos));
                 return fallbackService.search(criteria);
             }
             List<KnowledgeChunk> ranked = rerankOrLocal(effective, candidates);
+            log.info("Knowledge search completed, query={}, candidates={}, elapsedMs={}",
+                    criteria.getQuery(), candidates.size(), elapsedMs(startNanos));
             return ranked.stream()
                     .limit(effective.getLimit())
                     .map(this::toDocument)
                     .toList();
         } catch (Exception ex) {
+            log.warn("Knowledge search failed, falling back to local documents, query={}, elapsedMs={}, error={}",
+                    criteria.getQuery(), elapsedMs(startNanos), ex.getMessage());
             return fallbackService.search(criteria);
         }
     }
@@ -77,9 +97,13 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
     private List<KnowledgeChunk> recallCandidates(KnowledgeSearchCriteria criteria, RewrittenQuery rewritten) {
         Map<String, KnowledgeChunk> merged = new LinkedHashMap<>();
         try {
+            long embeddingStart = System.nanoTime();
             LlmConfig embeddingConfig = embeddingConfigResolver.resolveRequired();
             List<Float> vector = embeddingService.embed(rewritten.getQuery(), embeddingConfig);
-            List<VectorSearchHit> hits = vectorStore.search(vector, RECALL_LIMIT, criteria);
+            publishSegment("knowledge_embedding", "向量生成完成", embeddingStart);
+            long qdrantStart = System.nanoTime();
+            List<VectorSearchHit> hits = vectorStore.search(vector, RECALL_LIMIT, criteria, remoteTimeoutMs);
+            publishSegment("knowledge_qdrant", "向量召回完成", qdrantStart);
             List<String> chunkIds = hits.stream()
                     .map(VectorSearchHit::getChunkId)
                     .filter(id -> id != null && !id.isBlank())
@@ -96,9 +120,11 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
                     }
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.warn("Vector recall degraded to keyword recall, query={}, error={}", rewritten.getQuery(), ex.getMessage());
             // Keyword recall keeps the search usable when vector services are not ready.
         }
+        long keywordStart = System.nanoTime();
         List<KnowledgeChunk> keywordHits = knowledgeChunkMapper.searchKeyword(
                 rewritten.getQuery(),
                 criteria.getCountry(),
@@ -108,6 +134,7 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
                 criteria.getEndTime(),
                 criteria.effectivePermissionCodes(),
                 RECALL_LIMIT);
+        publishSegment("knowledge_keyword", "关键词召回完成", keywordStart);
         for (KnowledgeChunk chunk : keywordHits) {
             KnowledgeChunk existing = merged.getOrDefault(chunk.getChunkId(), chunk);
             existing.setKeywordScore(keywordScore(chunk, rewritten));
@@ -122,10 +149,15 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
     }
 
     private List<KnowledgeChunk> rerankOrLocal(KnowledgeSearchCriteria criteria, List<KnowledgeChunk> candidates) {
+        if (!rerankEnabled) {
+            return localRank(candidates);
+        }
+        long rerankStart = System.nanoTime();
         try {
             LlmConfig config = rerankConfigResolver.resolveRequired();
             List<String> docs = candidates.stream().map(this::rerankText).toList();
             List<RerankResult> results = rerankService.rerank(criteria.getQuery(), docs, criteria.getLimit(), config);
+            publishSegment("knowledge_rerank", "重排完成", rerankStart);
             if (!results.isEmpty()) {
                 List<KnowledgeChunk> ranked = new ArrayList<>();
                 for (RerankResult result : results) {
@@ -138,9 +170,15 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
                 }
                 return ranked;
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.warn("Rerank degraded to local rank, query={}, elapsedMs={}, error={}",
+                    criteria.getQuery(), elapsedMs(rerankStart), ex.getMessage());
             // Fall back to local fusion when rerank is not configured or temporarily unavailable.
         }
+        return localRank(candidates);
+    }
+
+    private List<KnowledgeChunk> localRank(List<KnowledgeChunk> candidates) {
         return candidates.stream()
                 .sorted(Comparator.comparingDouble((KnowledgeChunk chunk) -> chunk.getSimilarityScore() == null ? 0D : chunk.getSimilarityScore()).reversed())
                 .toList();
@@ -216,5 +254,18 @@ public class QdrantKnowledgeBaseService implements KnowledgeBaseService {
         doc.setRerankScore(chunk.getRerankScore());
         doc.setSimilarityScore(chunk.getSimilarityScore());
         return doc;
+    }
+
+    private void publishSegment(String stage, String message, long startNanos) {
+        long elapsedMs = elapsedMs(startNanos);
+        AgentRunContext context = AgentRunContextHolder.get();
+        if (context != null) {
+            context.publishStatus(stage, message + " " + elapsedMs + "ms", elapsedMs);
+        }
+        log.info("{}, stage={}, elapsedMs={}", message, stage, elapsedMs);
+    }
+
+    private long elapsedMs(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000L;
     }
 }

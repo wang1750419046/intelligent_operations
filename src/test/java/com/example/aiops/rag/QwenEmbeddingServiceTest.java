@@ -22,7 +22,7 @@ class QwenEmbeddingServiceTest {
     void shouldUseOpenAiCompatibleEndpointForTextEmbeddingModel() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        QwenEmbeddingService service = new QwenEmbeddingService(builder, 1024);
+        QwenEmbeddingService service = new QwenEmbeddingService(builder, 1024, 0);
 
         server.expect(requestTo("https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"))
                 .andExpect(method(HttpMethod.POST))
@@ -41,7 +41,7 @@ class QwenEmbeddingServiceTest {
     void shouldUseMultimodalEndpointForVisionEmbeddingModel() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        QwenEmbeddingService service = new QwenEmbeddingService(builder, 1024);
+        QwenEmbeddingService service = new QwenEmbeddingService(builder, 1024, 0);
 
         server.expect(requestTo("https://dashscope.aliyuncs.com/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding"))
                 .andExpect(method(HttpMethod.POST))

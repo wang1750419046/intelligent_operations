@@ -18,7 +18,11 @@ import com.example.aiops.util.TraceIdHolder;
 import dev.ai4j.openai4j.OpenAiHttpException;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.TokenStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +31,8 @@ import java.util.UUID;
 
 @Component
 public class OpsAgentExecutor implements AgentExecutor {
+
+    private static final Logger log = LoggerFactory.getLogger(OpsAgentExecutor.class);
 
     private final SessionService sessionService;
     private final AgentTraceService agentTraceService;
@@ -37,6 +43,7 @@ public class OpsAgentExecutor implements AgentExecutor {
     private final MetricsQueryTool metricsQueryTool;
     private final KnowledgeSearchTool knowledgeSearchTool;
     private final int maxHistoryMessages;
+    private final boolean progressEventsEnabled;
 
     public OpsAgentExecutor(SessionService sessionService,
                             AgentTraceService agentTraceService,
@@ -46,7 +53,8 @@ public class OpsAgentExecutor implements AgentExecutor {
                             LogQueryTool logQueryTool,
                             MetricsQueryTool metricsQueryTool,
                             KnowledgeSearchTool knowledgeSearchTool,
-                            @Value("${aiops.memory.max-history-messages:10}") int maxHistoryMessages) {
+                            @Value("${aiops.memory.max-history-messages:10}") int maxHistoryMessages,
+                            @Value("${aiops.agent.progress-events.enabled:true}") boolean progressEventsEnabled) {
         this.sessionService = sessionService;
         this.agentTraceService = agentTraceService;
         this.modelConfigService = modelConfigService;
@@ -56,6 +64,7 @@ public class OpsAgentExecutor implements AgentExecutor {
         this.metricsQueryTool = metricsQueryTool;
         this.knowledgeSearchTool = knowledgeSearchTool;
         this.maxHistoryMessages = maxHistoryMessages;
+        this.progressEventsEnabled = progressEventsEnabled;
     }
 
     @Override
@@ -91,22 +100,113 @@ public class OpsAgentExecutor implements AgentExecutor {
                 throw new BusinessException(50002, "llm returned empty result");
             }
 
-            agentTraceService.record(traceId, sessionId, context.nextStepNo(), "LLM produced final answer", "final_answer", "{}", answer);
-
-            ChatMessage assistantMessage = new ChatMessage();
-            assistantMessage.setMessageId("msg_" + UUID.randomUUID().toString().replace("-", ""));
-            assistantMessage.setSessionId(sessionId);
-            assistantMessage.setScope(SessionServiceImpl.UI_SCOPE);
-            assistantMessage.setRole("assistant");
-            assistantMessage.setContent(answer);
-            assistantMessage.setCreatedAt(LocalDateTime.now());
-            sessionService.appendMessage(assistantMessage);
-
-            ChatResponse response = new ChatResponse(answer, context.getUsedTools(), context.getReferences());
-            return new AgentExecutionResult(traceId, response);
+            return completeRun(traceId, sessionId, context, answer);
         } finally {
             AgentRunContextHolder.clear();
         }
+    }
+
+    @Override
+    public void executeStream(String sessionId, String userInput, Long modelConfigId, AgentStreamHandler handler) {
+        ChatSession session = sessionService.getSession(sessionId);
+        LlmConfig llmConfig = modelConfigService.resolveActiveConfig(modelConfigId != null ? modelConfigId : session.getModelConfigId());
+        if (llmConfig.getApiKey() == null || llmConfig.getApiKey().isBlank()) {
+            throw new BusinessException(40022, "selected model config has no api key");
+        }
+
+        String traceId = TraceIdHolder.getTraceId();
+        AgentRunContext context = new AgentRunContext(sessionId, traceId);
+        handler.onStart(traceId);
+        if (progressEventsEnabled) {
+            context.setStatusConsumer(handler::onStatus);
+            context.publishStatus("understanding", "正在理解问题");
+        }
+        AgentRunContextHolder.set(context);
+        try {
+            StreamingChatLanguageModel model = chatModelFactory.createStreaming(llmConfig);
+            OpsAgentStreamingAssistant assistant = AiServices.builder(OpsAgentStreamingAssistant.class)
+                    .streamingChatLanguageModel(model)
+                    .chatMemoryProvider(memoryId -> MessageWindowChatMemory.builder()
+                            .id(memoryId)
+                            .maxMessages(maxHistoryMessages)
+                            .chatMemoryStore(dbChatMemoryStore)
+                            .build())
+                    .tools(logQueryTool, metricsQueryTool, knowledgeSearchTool)
+                    .build();
+
+            StringBuilder streamedAnswer = new StringBuilder();
+            TokenStream tokenStream = assistant.analyze(sessionId, userInput);
+            tokenStream
+                    .onNext(token -> {
+                        AgentRunContextHolder.set(context);
+                        try {
+                            if (streamedAnswer.isEmpty()) {
+                                long firstTokenMs = context.markFirstToken();
+                                log.info("Agent first token produced, traceId={}, sessionId={}, firstTokenMs={}",
+                                        traceId, sessionId, firstTokenMs);
+                                agentTraceService.record(traceId, sessionId, context.nextStepNo(),
+                                        "Agent timing", "first_token", "{}",
+                                        "firstTokenMs=" + firstTokenMs);
+                            }
+                            streamedAnswer.append(token);
+                            handler.onToken(token);
+                        } finally {
+                            AgentRunContextHolder.clear();
+                        }
+                    })
+                    .onComplete(response -> {
+                        AgentRunContextHolder.set(context);
+                        try {
+                            String answer = response.content() == null ? null : response.content().text();
+                            if (answer == null || answer.isBlank()) {
+                                answer = streamedAnswer.toString();
+                            }
+                            if (answer == null || answer.isBlank()) {
+                                throw new BusinessException(50002, "llm returned empty result");
+                            }
+                            handler.onComplete(completeRun(traceId, sessionId, context, answer));
+                        } catch (RuntimeException ex) {
+                            handler.onError(ex);
+                        } finally {
+                            AgentRunContextHolder.clear();
+                        }
+                    })
+                    .onError(error -> {
+                        AgentRunContextHolder.set(context);
+                        try {
+                            RuntimeException runtimeException = error instanceof RuntimeException ex ? ex : new RuntimeException(error);
+                            handler.onError(normalizeLlmException(runtimeException, llmConfig));
+                        } finally {
+                            AgentRunContextHolder.clear();
+                        }
+                    })
+                    .start();
+        } catch (RuntimeException ex) {
+            throw normalizeLlmException(ex, llmConfig);
+        } finally {
+            AgentRunContextHolder.clear();
+        }
+    }
+
+    private AgentExecutionResult completeRun(String traceId, String sessionId, AgentRunContext context, String answer) {
+        long totalMs = context.elapsedMs();
+        log.info("Agent run completed, traceId={}, sessionId={}, totalMs={}, firstTokenMs={}",
+                traceId, sessionId, totalMs, context.getFirstTokenMs());
+        agentTraceService.record(traceId, sessionId, context.nextStepNo(), "Agent timing", "agent_total", "{}",
+                "totalMs=" + totalMs + ", firstTokenMs=" + context.getFirstTokenMs());
+        agentTraceService.record(traceId, sessionId, context.nextStepNo(), "LLM produced final answer", "final_answer", "{}", answer);
+
+        ChatMessage assistantMessage = new ChatMessage();
+        assistantMessage.setMessageId("msg_" + UUID.randomUUID().toString().replace("-", ""));
+        assistantMessage.setSessionId(sessionId);
+        assistantMessage.setScope(SessionServiceImpl.UI_SCOPE);
+        assistantMessage.setRole("assistant");
+        assistantMessage.setContent(answer);
+        assistantMessage.setCreatedAt(LocalDateTime.now());
+        sessionService.appendMessage(assistantMessage);
+
+        ChatResponse response = new ChatResponse(answer, context.getUsedTools(), context.getReferences());
+        return new AgentExecutionResult(traceId, response);
     }
 
     private RuntimeException normalizeLlmException(RuntimeException ex, LlmConfig config) {

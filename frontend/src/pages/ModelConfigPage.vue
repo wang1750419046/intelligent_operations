@@ -22,6 +22,10 @@
       <button @click="openCreateModal">新建配置</button>
     </section>
 
+    <div v-if="pageMessage" class="result-box model-page-message">
+      {{ pageMessage }}
+    </div>
+
     <section class="model-card-grid">
       <button
         v-for="item in modelConfigs"
@@ -158,13 +162,15 @@
         </div>
 
         <div class="modal-actions model-modal-actions">
-          <button class="danger" :disabled="!form.id" @click="remove">删除</button>
+          <button class="danger" :disabled="saving || !form.id" @click="remove">删除</button>
           <span></span>
-          <button class="secondary" :disabled="!form.id" @click="test">
+          <button class="secondary" :disabled="saving || !form.id" @click="test">
             {{ activeType === 'CHAT' ? '测试连接' : activeType === 'EMBEDDING' ? '测试向量模型' : '测试 Rerank' }}
           </button>
-          <button class="secondary" @click="closeModal">取消</button>
-          <button @click="save">保存</button>
+          <button class="secondary" :disabled="saving" @click="closeModal">取消</button>
+          <button :disabled="saving || !canSaveConfig" @click="save">
+            {{ saving ? '保存中...' : '保存' }}
+          </button>
         </div>
       </section>
     </div>
@@ -208,10 +214,18 @@ const activeTypeLabel = computed(() => {
 })
 const modelConfigs = ref([])
 const testResult = ref('')
+const pageMessage = ref('')
+const saving = ref(false)
 const reindexResult = ref('')
 const reindexing = ref(false)
 const vectorStatus = ref({})
 const activeModal = ref('')
+const canSaveConfig = computed(() => Boolean(
+  form.name?.trim()
+    && form.provider?.trim()
+    && form.baseUrl?.trim()
+    && form.modelName?.trim(),
+))
 
 const emptyForm = () => {
   if (activeType.value === 'EMBEDDING') {
@@ -292,6 +306,7 @@ const resetForm = () => {
 
 const openCreateModal = () => {
   resetForm()
+  pageMessage.value = ''
   activeModal.value = 'model'
 }
 
@@ -302,6 +317,7 @@ const closeModal = () => {
 const switchType = async (type) => {
   activeType.value = type
   resetForm()
+  pageMessage.value = ''
   await loadData()
 }
 
@@ -334,6 +350,7 @@ const editItem = (item) => {
     enabled: item.enabled,
     defaultConfig: item.defaultConfig,
   })
+  pageMessage.value = ''
   testResult.value = item.hasApiKey ? '当前配置已保存 API Key' : '当前配置尚未保存 API Key'
   activeModal.value = 'model'
 }
@@ -341,12 +358,13 @@ const editItem = (item) => {
 const displayApiKey = (apiKey) => apiKey ?? 'null'
 
 const save = async () => {
+  if (!canSaveConfig.value || saving.value) return
   const payload = {
-    name: form.name,
+    name: form.name.trim(),
     configType: activeType.value,
     provider: activeType.value === 'EMBEDDING' ? embeddingPreset.provider : activeType.value === 'RERANK' ? rerankPreset.provider : form.provider,
-    baseUrl: form.baseUrl,
-    modelName: form.modelName,
+    baseUrl: form.baseUrl.trim(),
+    modelName: form.modelName.trim(),
     temperature: form.temperature,
     maxTokens: activeType.value === 'CHAT' ? form.maxTokens : null,
     enabled: form.enabled,
@@ -355,6 +373,9 @@ const save = async () => {
   if (form.apiKey && form.apiKey.trim()) {
     payload.apiKey = form.apiKey.trim()
   }
+  saving.value = true
+  testResult.value = '正在保存配置...'
+  pageMessage.value = ''
   try {
     if (form.id) {
       await updateModelConfig(form.id, payload)
@@ -362,11 +383,16 @@ const save = async () => {
       await createModelConfig(payload)
     }
     await loadData()
-    await loadVectorStatus()
+    if (activeType.value === 'EMBEDDING') {
+      await loadVectorStatus()
+    }
+    pageMessage.value = `${activeTypeLabel.value}配置已保存`
     resetForm()
     closeModal()
   } catch (error) {
     testResult.value = error.message
+  } finally {
+    saving.value = false
   }
 }
 

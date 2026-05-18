@@ -24,6 +24,8 @@ public class KnowledgeSearchTool {
     @Tool("检索历史故障案例和知识库条目")
     public String searchKnowledge(@P("query") String query) {
         String safeQuery = query == null || query.isBlank() ? "接口变慢" : query;
+        long startNanos = System.nanoTime();
+        toolCallbackSupport.started("search_knowledge");
         String params = "{query=%s}".formatted(safeQuery);
         try {
             List<KnowledgeDocument> docs = knowledgeBaseService.search(safeQuery, 3);
@@ -41,8 +43,10 @@ public class KnowledgeSearchTool {
                         .toList();
             }
             toolCallbackSupport.success("search_knowledge", params, summary, references);
+            toolCallbackSupport.finished("search_knowledge", toolCallbackSupport.elapsedMs(startNanos));
             return summary;
         } catch (Exception ex) {
+            toolCallbackSupport.finished("search_knowledge", toolCallbackSupport.elapsedMs(startNanos));
             return toolCallbackSupport.failure("search_knowledge", params, ex);
         }
     }

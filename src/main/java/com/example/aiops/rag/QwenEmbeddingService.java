@@ -3,10 +3,12 @@ package com.example.aiops.rag;
 import com.example.aiops.exception.BusinessException;
 import com.example.aiops.entity.LlmConfig;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,11 +19,14 @@ public class QwenEmbeddingService {
 
     private final RestClient.Builder restClientBuilder;
     private final int dimensions;
+    private final long remoteTimeoutMs;
 
     public QwenEmbeddingService(RestClient.Builder restClientBuilder,
-                                @Value("${aiops.vector.embedding.dimensions:1024}") int dimensions) {
+                                @Value("${aiops.vector.embedding.dimensions:1024}") int dimensions,
+                                @Value("${aiops.rag.remote-timeout-ms:2000}") long remoteTimeoutMs) {
         this.restClientBuilder = restClientBuilder;
         this.dimensions = dimensions;
+        this.remoteTimeoutMs = remoteTimeoutMs;
     }
 
     public List<Float> embed(String text, LlmConfig config) {
@@ -61,7 +66,7 @@ public class QwenEmbeddingService {
             body.put("dimensions", dimensions);
             body.put("encoding_format", "float");
         }
-        Map<String, Object> response = restClientBuilder
+        Map<String, Object> response = timedBuilder()
                 .baseUrl(trimTrailingSlash(config.getBaseUrl()))
                 .build()
                 .post()
@@ -106,7 +111,7 @@ public class QwenEmbeddingService {
         if (supportsMultimodalDimensions(config.getModelName())) {
             body.put("parameters", Map.of("dimension", dimensions));
         }
-        Map<String, Object> response = restClientBuilder
+        Map<String, Object> response = timedBuilder()
                 .baseUrl(multimodalBaseUrl(config.getBaseUrl()))
                 .build()
                 .post()
@@ -202,5 +207,15 @@ public class QwenEmbeddingService {
             return "";
         }
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private RestClient.Builder timedBuilder() {
+        if (remoteTimeoutMs <= 0) {
+            return restClientBuilder.clone();
+        }
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofMillis(remoteTimeoutMs));
+        factory.setReadTimeout(Duration.ofMillis(remoteTimeoutMs));
+        return restClientBuilder.clone().requestFactory(factory);
     }
 }

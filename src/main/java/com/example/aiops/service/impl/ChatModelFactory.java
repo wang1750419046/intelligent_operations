@@ -2,7 +2,9 @@ package com.example.aiops.service.impl;
 
 import com.example.aiops.entity.LlmConfig;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +21,19 @@ public class ChatModelFactory {
 
     public ChatLanguageModel create(LlmConfig config) {
         return OpenAiChatModel.builder()
+                .baseUrl(config.getBaseUrl())
+                .apiKey(config.getApiKey())
+                .modelName(config.getModelName())
+                .temperature(config.getTemperature() == null ? null : config.getTemperature().doubleValue())
+                .timeout(Duration.ofSeconds(timeoutSeconds))
+                .maxTokens(config.getMaxTokens())
+                .logRequests(true)
+                .logResponses(true)
+                .build();
+    }
+
+    public StreamingChatLanguageModel createStreaming(LlmConfig config) {
+        return OpenAiStreamingChatModel.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
                 .modelName(config.getModelName())

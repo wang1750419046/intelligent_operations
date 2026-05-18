@@ -23,6 +23,8 @@ public class LogQueryTool {
             @P("timeRange") String timeRange,
             @P("keyword") String keyword
     ) {
+        long startNanos = System.nanoTime();
+        toolCallbackSupport.started("query_logs");
         String params = "{serviceName=%s, timeRange=%s, keyword=%s}".formatted(serviceName, timeRange, keyword);
         try {
             if ("fail".equalsIgnoreCase(keyword)) {
@@ -35,8 +37,10 @@ public class LogQueryTool {
                     new ReferenceItem("log", "关键日志片段", "[ERROR] HikariPool timeout after 30000ms", "mock-log-store")
             );
             toolCallbackSupport.success("query_logs", params, summary, references);
+            toolCallbackSupport.finished("query_logs", toolCallbackSupport.elapsedMs(startNanos));
             return summary;
         } catch (Exception ex) {
+            toolCallbackSupport.finished("query_logs", toolCallbackSupport.elapsedMs(startNanos));
             return toolCallbackSupport.failure("query_logs", params, ex);
         }
     }

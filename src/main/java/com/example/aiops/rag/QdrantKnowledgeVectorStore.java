@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static io.qdrant.client.ConditionFactory.matchKeyword;
 import static io.qdrant.client.ConditionFactory.matchKeywords;
@@ -113,7 +114,15 @@ public class QdrantKnowledgeVectorStore {
     }
 
     public List<VectorSearchHit> search(List<Float> vector, int limit, KnowledgeSearchCriteria criteria) {
-        ensureCollection();
+        return search(vector, limit, criteria, 0L);
+    }
+
+    public List<VectorSearchHit> search(List<Float> vector, int limit, KnowledgeSearchCriteria criteria, long timeoutMs) {
+        if (timeoutMs > 0) {
+            ensureCollection(timeoutMs);
+        } else {
+            ensureCollection();
+        }
         SearchPoints.Builder builder = SearchPoints.newBuilder()
                 .setCollectionName(collectionName)
                 .addAllVector(vector)
@@ -124,7 +133,9 @@ public class QdrantKnowledgeVectorStore {
         }
         SearchPoints request = builder.build();
         try {
-            List<ScoredPoint> points = client.searchAsync(request).get();
+            List<ScoredPoint> points = timeoutMs > 0
+                    ? client.searchAsync(request).get(timeoutMs, TimeUnit.MILLISECONDS)
+                    : client.searchAsync(request).get();
             List<VectorSearchHit> hits = new ArrayList<>();
             for (ScoredPoint point : points) {
                 if (point.getPayloadMap().containsKey("docId")) {
@@ -138,6 +149,21 @@ public class QdrantKnowledgeVectorStore {
             return hits;
         } catch (Exception ex) {
             throw new IllegalStateException("Qdrant search failed: " + ex.getMessage(), ex);
+        }
+    }
+
+    private void ensureCollection(long timeoutMs) {
+        try {
+            if (Boolean.TRUE.equals(client.collectionExistsAsync(collectionName).get(timeoutMs, TimeUnit.MILLISECONDS))) {
+                return;
+            }
+            VectorParams params = VectorParams.newBuilder()
+                    .setSize(dimensions)
+                    .setDistance(Distance.Cosine)
+                    .build();
+            client.createCollectionAsync(collectionName, params).get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Qdrant collection init failed: " + ex.getMessage(), ex);
         }
     }
 

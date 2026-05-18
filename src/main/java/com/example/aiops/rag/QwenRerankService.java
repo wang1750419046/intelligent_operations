@@ -1,9 +1,12 @@
 package com.example.aiops.rag;
 
 import com.example.aiops.entity.LlmConfig;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,9 +16,12 @@ import java.util.Map;
 public class QwenRerankService {
 
     private final RestClient.Builder restClientBuilder;
+    private final long remoteTimeoutMs;
 
-    public QwenRerankService(RestClient.Builder restClientBuilder) {
+    public QwenRerankService(RestClient.Builder restClientBuilder,
+                             @Value("${aiops.rag.remote-timeout-ms:2000}") long remoteTimeoutMs) {
         this.restClientBuilder = restClientBuilder;
+        this.remoteTimeoutMs = remoteTimeoutMs;
     }
 
     @SuppressWarnings("unchecked")
@@ -32,7 +38,7 @@ public class QwenRerankService {
         body.put("documents", documents);
         body.put("top_n", Math.min(topN, documents.size()));
         body.put("instruct", "Given an operations incident search query, retrieve relevant runbook or case passages that answer the query.");
-        Map<String, Object> response = restClientBuilder
+        Map<String, Object> response = timedBuilder()
                 .baseUrl(trimTrailingSlash(config.getBaseUrl()))
                 .build()
                 .post()
@@ -73,5 +79,15 @@ public class QwenRerankService {
             return "";
         }
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private RestClient.Builder timedBuilder() {
+        if (remoteTimeoutMs <= 0) {
+            return restClientBuilder.clone();
+        }
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofMillis(remoteTimeoutMs));
+        factory.setReadTimeout(Duration.ofMillis(remoteTimeoutMs));
+        return restClientBuilder.clone().requestFactory(factory);
     }
 }

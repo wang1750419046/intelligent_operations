@@ -2,6 +2,7 @@ package com.example.aiops.service.impl;
 
 import com.example.aiops.agent.AgentExecutionResult;
 import com.example.aiops.agent.AgentExecutor;
+import com.example.aiops.agent.AgentStreamHandler;
 import com.example.aiops.entity.ChatMessage;
 import com.example.aiops.service.ChatService;
 import com.example.aiops.service.SessionService;
@@ -23,6 +24,17 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public AgentExecutionResult send(String sessionId, String userInput, Long modelConfigId) {
+        appendUserMessage(sessionId, userInput);
+        return agentExecutor.execute(sessionId, userInput, modelConfigId);
+    }
+
+    @Override
+    public void stream(String sessionId, String userInput, Long modelConfigId, AgentStreamHandler handler) {
+        appendUserMessage(sessionId, userInput);
+        agentExecutor.executeStream(sessionId, userInput, modelConfigId, handler);
+    }
+
+    private void appendUserMessage(String sessionId, String userInput) {
         sessionService.getSession(sessionId);
         ChatMessage userMessage = new ChatMessage();
         userMessage.setMessageId("msg_" + UUID.randomUUID().toString().replace("-", ""));
@@ -32,6 +44,5 @@ public class ChatServiceImpl implements ChatService {
         userMessage.setContent(userInput);
         userMessage.setCreatedAt(LocalDateTime.now());
         sessionService.appendMessage(userMessage);
-        return agentExecutor.execute(sessionId, userInput, modelConfigId);
     }
 }

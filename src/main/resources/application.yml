@@ -16,9 +16,18 @@ server:
   port: 8080
 
 aiops:
+  agent:
+    progress-events:
+      enabled: true
   llm:
     timeout-seconds: 60
     default-temperature: 0.2
+  rag:
+    query-rewrite:
+      enabled: false
+    rerank:
+      enabled: false
+    remote-timeout-ms: 2000
   memory:
     max-history-messages: 10
   cors:

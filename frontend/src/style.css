@@ -613,6 +613,10 @@ textarea {
   gap: 14px;
 }
 
+.model-page-message {
+  margin-bottom: 18px;
+}
+
 .model-config-button {
   width: 100%;
   text-align: left;
@@ -782,6 +786,72 @@ textarea {
 .message-card.assistant pre {
   font-size: 15px;
   line-height: 1.75;
+}
+
+.message-markdown {
+  margin-top: 8px;
+}
+
+.message-markdown pre {
+  margin-top: 0;
+}
+
+.message-markdown pre + .markdown-table-wrap,
+.markdown-table-wrap + pre,
+.markdown-table-wrap + .markdown-table-wrap {
+  margin-top: 12px;
+}
+
+.markdown-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.markdown-table-wrap table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.markdown-table-wrap th,
+.markdown-table-wrap td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e8eef6;
+  border-right: 1px solid #e8eef6;
+  text-align: left;
+  vertical-align: top;
+  word-break: keep-all;
+}
+
+.markdown-table-wrap th:last-child,
+.markdown-table-wrap td:last-child {
+  border-right: 0;
+}
+
+.markdown-table-wrap tr:last-child td {
+  border-bottom: 0;
+}
+
+.markdown-table-wrap th {
+  color: #344054;
+  background: #f4f8fb;
+  font-weight: 900;
+}
+
+.markdown-table-wrap tbody tr:nth-child(even) {
+  background: #fbfdff;
+}
+
+.markdown-table-wrap tbody td:first-child {
+  color: #0b746f;
+  font-weight: 900;
+  background: #f7fbfa;
+  white-space: nowrap;
 }
 
 .message-role {

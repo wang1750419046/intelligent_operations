@@ -72,7 +72,7 @@
           </div>
         </div>
 
-        <div class="chat-log">
+        <div class="chat-log" ref="chatLogRef">
           <div v-if="!messages.length" class="empty-state">
             <strong>开始一次诊断</strong>
             <span>例如：昨天 2 点到 3 点订单接口响应变慢，帮我分析原因。</span>
@@ -86,7 +86,26 @@
             <div class="message-role">
               <span>{{ roleLabel(message.role) }}</span>
             </div>
-            <pre>{{ message.content }}</pre>
+            <div v-if="message.role === 'assistant'" class="message-markdown">
+              <template v-for="(block, index) in renderMessageBlocks(message.content || message.status || '')" :key="index">
+                <div v-if="block.type === 'table'" class="markdown-table-wrap">
+                  <table>
+                    <thead v-if="block.headers.length">
+                      <tr>
+                        <th v-for="(cell, cellIndex) in block.headers" :key="cellIndex">{{ cell }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(row, rowIndex) in block.rows" :key="rowIndex">
+                        <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <pre v-else>{{ block.content }}</pre>
+              </template>
+            </div>
+            <pre v-else>{{ message.content || message.status || '' }}</pre>
           </div>
         </div>
 
@@ -150,7 +169,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { createSession, deleteSession, getSessionDetail, listSessions } from '../api/session'
-import { sendChat } from '../api/chat'
+import { streamChat } from '../api/chat'
 import { getTrace } from '../api/trace'
 import { listModelConfigs } from '../api/modelConfig'
 
@@ -166,11 +185,108 @@ const sending = ref(false)
 const errorMessage = ref('')
 const userInput = ref('')
 const chatModelConfigId = ref(null)
+const chatLogRef = ref(null)
+let scrollPending = false
 
 const roleLabel = (role) => {
   if (role === 'user') return '你'
   if (role === 'assistant') return 'Agent'
   return role
+}
+
+const formatElapsed = (elapsedMs) => {
+  if (elapsedMs === null || elapsedMs === undefined) return ''
+  if (elapsedMs < 1000) return `${elapsedMs}ms`
+  return `${(elapsedMs / 1000).toFixed(1)}s`
+}
+
+const scrollChatToBottom = () => {
+  if (scrollPending) return
+  scrollPending = true
+  requestAnimationFrame(() => {
+    scrollPending = false
+    const element = chatLogRef.value
+    if (element) {
+      element.scrollTop = element.scrollHeight
+    }
+  })
+}
+
+const formatStatusMessage = (status, fallbackElapsedMs) => {
+  const message = status.message || '正在处理'
+  const elapsed = formatElapsed(status.elapsedMs ?? fallbackElapsedMs)
+  return elapsed ? `${message}（后端已执行 ${elapsed}）` : message
+}
+
+const isTableSeparator = (line) => {
+  const cells = parseTableCells(line)
+  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s/g, '')))
+}
+
+const isTableLine = (line) => {
+  const trimmed = line.trim()
+  return trimmed.startsWith('|') && trimmed.endsWith('|') && parseTableCells(trimmed).length > 1
+}
+
+const cleanMarkdownCell = (value) => value
+  .replace(/^\*\*(.*)\*\*$/, '$1')
+  .replace(/`([^`]+)`/g, '$1')
+  .trim()
+
+const parseTableCells = (line) => line
+  .trim()
+  .replace(/^\|/, '')
+  .replace(/\|$/, '')
+  .split('|')
+  .map(cleanMarkdownCell)
+
+const normalizeTableRows = (rows) => {
+  const maxColumns = Math.max(...rows.map((row) => row.length))
+  return rows.map((row) => {
+    if (row.length >= maxColumns) return row
+    return [...row, ...Array(maxColumns - row.length).fill('')]
+  })
+}
+
+const renderMessageBlocks = (text) => {
+  const blocks = []
+  const lines = (text || '').split('\n')
+  let index = 0
+
+  while (index < lines.length) {
+    if (isTableLine(lines[index])) {
+      const tableLines = []
+      while (index < lines.length && isTableLine(lines[index])) {
+        tableLines.push(lines[index])
+        index += 1
+      }
+
+      if (tableLines.length > 1) {
+        const rows = normalizeTableRows(tableLines.map(parseTableCells))
+        const hasHeader = rows.length > 2 && isTableSeparator(tableLines[1])
+        blocks.push({
+          type: 'table',
+          headers: hasHeader ? rows[0] : [],
+          rows: hasHeader ? rows.slice(2) : rows,
+        })
+      } else {
+        blocks.push({ type: 'text', content: tableLines[0] })
+      }
+      continue
+    }
+
+    const textLines = []
+    while (index < lines.length && !isTableLine(lines[index])) {
+      textLines.push(lines[index])
+      index += 1
+    }
+    const content = textLines.join('\n').trim()
+    if (content) {
+      blocks.push({ type: 'text', content })
+    }
+  }
+
+  return blocks.length ? blocks : [{ type: 'text', content: text || '' }]
 }
 
 const loadSessions = async () => {
@@ -199,6 +315,7 @@ const selectSession = async (sessionId) => {
   messages.value = response.data.messages || []
   traceSteps.value = []
   lastReferences.value = []
+  scrollChatToBottom()
 }
 
 const handleCreateSession = async () => {
@@ -228,19 +345,75 @@ const handleSend = async () => {
   if (!userInput.value.trim()) return
   sending.value = true
   errorMessage.value = ''
+  const prompt = userInput.value.trim()
+  const userMessageId = `local_user_${Date.now()}`
+  const assistantMessageId = `local_assistant_${Date.now()}`
+  const updateAssistantMessage = (updater) => {
+    const index = messages.value.findIndex((message) => message.messageId === assistantMessageId)
+    if (index === -1) return
+    updater(messages.value[index])
+  }
   try {
     const sessionId = await ensureSession()
-    const response = await sendChat({
-      sessionId,
-      userInput: userInput.value,
-      modelConfigId: chatModelConfigId.value,
-    })
-    lastTraceId.value = response.traceId
     userInput.value = ''
+    messages.value.push({
+      messageId: userMessageId,
+      role: 'user',
+      content: prompt,
+    })
+    const assistantMessage = {
+      messageId: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      status: '正在理解问题',
+      stage: 'understanding',
+      serverElapsedMs: 0,
+    }
+    messages.value.push(assistantMessage)
+    scrollChatToBottom()
+
+    let finalResponse = null
+    await streamChat({
+      sessionId,
+      userInput: prompt,
+      modelConfigId: chatModelConfigId.value,
+    }, {
+      onTrace: (traceId) => {
+        lastTraceId.value = traceId
+      },
+      onStatus: (status) => {
+        updateAssistantMessage((message) => {
+          message.stage = status.stage || message.stage
+          message.serverElapsedMs = status.elapsedMs ?? message.serverElapsedMs
+          message.status = formatStatusMessage(status, message.serverElapsedMs)
+        })
+        scrollChatToBottom()
+      },
+      onDelta: (token) => {
+        updateAssistantMessage((message) => {
+          message.status = ''
+          message.content += token
+        })
+        scrollChatToBottom()
+      },
+      onDone: (response) => {
+        finalResponse = response
+        lastTraceId.value = response.traceId || lastTraceId.value
+        updateAssistantMessage((message) => {
+          message.status = ''
+          message.content = response.answer || message.content
+        })
+        scrollChatToBottom()
+      },
+    })
     await selectSession(activeSessionId.value)
-    lastReferences.value = (response.data?.references || []).filter((item) => item.type === 'kb')
+    lastReferences.value = (finalResponse?.references || []).filter((item) => item.type === 'kb')
     await loadSessions()
   } catch (error) {
+    updateAssistantMessage((message) => {
+      message.status = message.content ? message.status : `处理失败：${error.message}`
+    })
+    scrollChatToBottom()
     errorMessage.value = error.message
   } finally {
     sending.value = false
